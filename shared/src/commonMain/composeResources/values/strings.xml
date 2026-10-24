@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Rhino Chat</string>
+    <string name="welcome_message">Your conversation starts here.</string>
+</resources>
