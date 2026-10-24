@@ -1,0 +1,33 @@
+# Gradle / Kotlin outputs and local machine configuration
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.hprof
+
+# IDE and operating system state
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Xcode user state; keep project files and shared schemes versioned
+**/xcuserdata/
+*.xcuserstate
+**/xcshareddata/WorkspaceSettings.xcsettings
+DerivedData/
+.build/
+.swiftpm/
+
+# Local signing material and environment secrets
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+!.env.example
+
+# Generated verification logs and preview exports
+/artifacts/
