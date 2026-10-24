@@ -19,6 +19,8 @@ The build/test/lint command was `./scripts/verify`. Its log is stored locally at
 
 The single current test exercises the common test runner and platform actual factory. It is an explicitly identified bootstrap smoke test. It does not prove message state, pagination, persistence, retries, or concurrency; those tests belong to the corresponding implementation milestones.
 
+After colocating the stateless screen, route, and previews in `WelcomeScreen.kt`, `:androidApp:assembleDebug` and `:shared:compileKotlinIosSimulatorArm64` passed again. The local log is `artifacts/verification/colocated-previews.log`.
+
 ## Environment and dependency decision
 
 - Android Studio Quail 1, 2026.1.1 Patch 2.
@@ -41,7 +43,7 @@ These warnings remain visible. They are not suppressed or represented as zero-wa
 
 The installed Android CLI preview exporter returned `Failed to obtain RenderResult` for the common preview. A fully qualified composable name returned `Failed to find preview element`. Some failed calls exited with status zero, so exit status alone must not be used as evidence of successful preview export.
 
-After refreshing the IDE's files and opening `WelcomeScreenPreview.kt`, the standard IDE preview panel rendered both variants. The light preview shows dark text on a light surface; the dark preview shows light text on a dark surface, with readable centered title/subtitle and no clipping. Layout bounds shown by the user's existing preview view settings are tooling overlays, not app UI. No successful standalone PNG export is claimed.
+After refreshing the IDE's files and opening the original preview file, the standard IDE preview panel rendered both variants. The previews now live at the bottom of `WelcomeScreen.kt`, after the stateless screen and its route. The light preview shows dark text on a light surface; the dark preview shows light text on a dark surface, with readable centered title/subtitle and no clipping. Layout bounds shown by the user's existing preview view settings are tooling overlays, not app UI. No successful standalone PNG export is claimed.
 
 ## Remaining scope
 

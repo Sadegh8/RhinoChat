@@ -36,7 +36,7 @@ The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ## First previews
 
-Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreenPreview.kt` in Android Studio and select Split or Design. Both previews use the same `RhinoChatTheme` and stateless `WelcomeScreen` as the application, with common string resources and no network or dependency injection.
+Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreen.kt` in Android Studio and select Split or Design. The file is ordered: stateless screen, resource-owning route, then private light/dark previews. The welcome route has no business state yet; future stateful screen entry points follow the same placement. Both previews use the same `RhinoChatTheme` and stateless `WelcomeScreen` as the application, with common string resources and no network or dependency injection.
 
 Both light and dark previews have been visually verified in the IDE. The installed Android CLI exporter currently fails to export these common previews, so use the IDE preview panel; see [validation notes](docs/VALIDATION.md). Generated artifacts and logs under `artifacts/` are ignored. Android-backed previews do not verify iOS runtime behavior.
 

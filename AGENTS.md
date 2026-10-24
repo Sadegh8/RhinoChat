@@ -10,6 +10,7 @@
 ## UI and state
 
 - Use `RhinoChatTheme` in the application and previews. Render screens from values and callbacks; keep state collection and dependency wiring at route/host boundaries.
+- Keep each screen in one Kotlin file, ordered: stateless screen, stateful route/overload, then private preview functions. Keep previews beside their component; do not create separate preview files/classes. Only add actual state ownership when the feature needs it.
 - Extract substantial components by responsibility. Avoid generic base classes, pass-through use cases, or extra modules without an actual consumer.
 - Use common string resources and deterministic, I/O-free previews. A compiled preview is not proof it rendered; an Android-backed preview is not iOS verification.
 - For future chat work, persist outgoing client identity before remote I/O, reuse it on retry, and merge acknowledgements/history into the canonical local rows.
@@ -20,7 +21,7 @@
 
 - `./scripts/verify`: debug APK, common tests through `:shared:testAndroidHostTest`, Android lint.
 - Run a focused Gradle task during a change; run the affected required checks at handoff. Use the wrapper, JDK 21, and the pinned version catalog.
-- First shared previews live in `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreenPreview.kt`; rendering instructions are in README.
+- First shared previews live at the bottom of `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreen.kt`; rendering instructions are in README.
 - Record actual results and limits in `docs/VALIDATION.md`. Bootstrap smoke tests do not establish chat correctness.
 
 ## Repository hygiene

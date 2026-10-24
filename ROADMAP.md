@@ -69,9 +69,7 @@ shared/                            KMP library; Android + iOS compilation target
         ChatViewModel.kt
         ChatUiState.kt
         ChatAction.kt              Only if a sealed action API improves clarity
-        ChatRoute.kt               Collects state and connects callbacks
-        ChatScreen.kt              Stateless rendering
-        ChatPreviewData.kt
+        ChatScreen.kt              Stateless screen, stateful route, then previews/fixtures
         components/
           MessageBubble.kt
           MessageComposer.kt
@@ -84,7 +82,7 @@ shared/                            KMP library; Android + iOS compilation target
 iosApp/                            Optional native host; add in the extension phase
 ```
 
-The tree describes responsibilities; it is not a quota of files or classes. Keep small related declarations together. Extract substantial components by responsibility or reuse, rather than creating a file per `Text` or a base class for every type.
+The tree describes responsibilities; it is not a quota of files or classes. Keep each screen's stateless composable, stateful route/overload, and previews together in that order in one Kotlin file, as requested by the user. Keep component previews in the component's file too. Extract substantial components by responsibility or reuse, rather than creating a file per `Text` or a base class for every type.
 
 On modern AGP, use a separate Android application and the Android KMP library plugin in `shared`; validate the exact Kotlin/AGP/Gradle/CMP/IDE combination before implementation. Pin dependencies in the version catalog and check API 24 support. Prefer a coherent stable set over the newest version of every artifact independently.
 
