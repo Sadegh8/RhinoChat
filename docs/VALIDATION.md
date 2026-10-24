@@ -1,6 +1,6 @@
-# Foundation validation
+# Validation
 
-Checked on 24 October 2026 in the existing project directory. This record covers the CMP foundation, not the chat feature.
+Checked on 24 October 2026 in the existing project directory. This record covers the CMP foundation and persistence/identity layer. Network orchestration and chat presentation are subsequent milestones.
 
 ## Verified results
 
@@ -17,7 +17,7 @@ Checked on 24 October 2026 in the existing project directory. This record covers
 
 The build/test/lint command was `./scripts/verify`. Its log is stored locally at `artifacts/verification/foundation.log`. Kotlin/Native compilation was checked separately, with a local log at `artifacts/verification/ios-compile.log`. Generated logs are intentionally excluded from commits.
 
-The single current test exercises the common test runner and platform actual factory. It is an explicitly identified bootstrap smoke test. It does not prove message state, pagination, persistence, retries, or concurrency; those tests belong to the corresponding implementation milestones.
+At the foundation milestone, the single shared test exercised the common test runner and platform actual factory. That bootstrap test alone did not prove message state, pagination, persistence, retries, or concurrency. The persistence checks below now cover local database behavior.
 
 After colocating the stateless screen, route, and previews in `WelcomeScreen.kt`, `:androidApp:assembleDebug` and `:shared:compileKotlinIosSimulatorArm64` passed again. The local log is `artifacts/verification/colocated-previews.log`.
 
@@ -45,9 +45,30 @@ The installed Android CLI preview exporter returned `Failed to obtain RenderResu
 
 After refreshing the IDE's files and opening the original preview file, the standard IDE preview panel rendered both variants. The previews now live at the bottom of `WelcomeScreen.kt`, after the stateless screen and its route. The light preview shows dark text on a light surface; the dark preview shows light text on a dark surface, with readable centered title/subtitle and no clipping. Layout bounds shown by the user's existing preview view settings are tooling overlays, not app UI. No successful standalone PNG export is claimed.
 
+## Persistence and identity validation
+
+The final command `./scripts/verify :shared:compileKotlinIosSimulatorArm64` passed after the persistence changes. Its local log is `artifacts/verification/persistence-validation.log`.
+
+| Check | Current result |
+| --- | --- |
+| Android debug APK | Built successfully |
+| JVM integration tests | All 11 `ChatLocalStoreTest` cases passed, with zero failures/errors/skips |
+| Common bootstrap test | Passed on JVM and Android host |
+| Shared iOS simulator compilation | Passed, including KSP-generated Room implementation |
+| Android lint | Zero errors, the same six non-blocking warnings listed above |
+| Exported Room schema | Version 1 contains `messages` and `conversation_pagination`, with the intended unique identity indexes |
+
+The database tests use the production common builder, a real bundled SQLite engine, and temporary on-disk databases. They verify persisted history, unsent state and identity after close/reopen; deterministic equal-time ordering; concurrent retry claims; acknowledgement/history reconciliation; duplicate-page cursor advancement; loaded-empty history; conversation-scoped uniqueness; transaction rollback on conflicting reused identities; interrupted-send recovery; and observed writes.
+
+A plain Android host test initially resolved the device-native SQLite artifact, which cannot load its JNI library on macOS. The JVM test target resolves the actual JVM Room/SQLite implementation without Android shadows or platform-artifact substitutions. No test is skipped to bypass that issue. The APK still uses Android dependencies.
+
+Kotlin reports beta `expect`/`actual` class warnings for Room's documented generated-constructor pattern. Those warnings remain visible; no global suppression was introduced. The iOS factory is compiled, not simulator-runtime tested.
+
+The user approved committing this milestone. Platform-specific Room builder creation was corrected after IDE diagnostics found `databaseBuilder` unresolved in common code. Common metadata compilation is now part of the verification script, in addition to platform builds.
+
 ## Remaining scope
 
 - No emulator/device app launch was performed in this milestone.
 - The SwiftUI iOS host was not built, linked, launched, or tested in a simulator. Shared Kotlin/Native compilation is a narrower result.
-- The original fake API and chat behavior are not introduced yet.
+- The original fake API, repository/network orchestration, and chat UI are not integrated yet. The welcome screen is unchanged; persistence is currently exercised through its real database tests.
 - The repository is local; no remote repository has been created or pushed.

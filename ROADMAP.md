@@ -1,6 +1,6 @@
 # Rhino chat challenge: review and implementation roadmap
 
-Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. CMP foundation implementation has started; chat architecture remains proposed.
+Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. CMP foundation is verified; persistence and identity are implemented for user review. Network orchestration and chat presentation remain subsequent work.
 
 The workspace was empty at review time. This document separates the employer's brief, current documentation, and our engineering decisions. Documentation findings and official source links are in [RESEARCH.md](docs/RESEARCH.md).
 
@@ -59,11 +59,11 @@ androidApp/                         Android application / packaging / compositio
 shared/                            KMP library; Android + iOS compilation targets
   src/commonMain/kotlin/.../
     chat/
-      model/                       Message identity and delivery status
-      data/
+      data/                        Plain message/page/status models
         ChatRepository.kt          Contract used by presentation
         DefaultChatRepository.kt   Local writes, remote orchestration, reconciliation
-        local/                     Room database, entities, DAO, pagination metadata
+        local/                     Room database, DAO, transactions, local observation
+          data/                    Internal persistence entities
         remote/                    Platform-neutral remote contract and transport values
       presentation/
         ChatViewModel.kt
@@ -75,7 +75,8 @@ shared/                            KMP library; Android + iOS compilation target
           MessageComposer.kt
           HistoryLoadStatus.kt
     theme/                         Shared theme and resources
-  src/commonTest/                   Repository/state tests with deterministic fakes
+  src/commonTest/                   Shared tests and future deterministic state tests
+  src/jvmTest/                      Real Room/SQLite file-backed database tests
   src/androidMain/                 Database construction and necessary Android adapters
   src/iosMain/                     Database construction when iOS is exercised
 
@@ -177,12 +178,14 @@ Use the supported `androidx.compose.ui.tooling.preview.Preview` setup for the se
 
 Foundation progress on 24 October: the Android build, shared host test runner, lint, common light/dark IDE previews, and shared iOS simulator Kotlin compilation are verified. Local Git and ignore rules are initialized. See [validation evidence and limits](docs/VALIDATION.md). The supplied API/adapter will be introduced with the data implementation; this milestone does not claim working chat behavior.
 
+Persistence progress: Room schema version 1, plain external models, stable local/client/server identities, local `Flow` observation, transactional acknowledgement/history merging, and persisted cursor metadata are implemented. Real database tests run on a JVM test target within `shared`. The user has reviewed and approved committing this milestone. See [the implemented model](docs/ARCHITECTURE.md).
+
 Tests are added alongside each behavior; the verification allocation completes the integration checks. These estimates assume a functioning local Android toolchain and cached dependencies.
 
 | Phase | Budget | Deliverable and exit condition |
 | --- | --- | --- |
 | 1. Foundation | 25 min | Two-module CMP shell, API 24, pinned compatible dependencies, original fake isolated, app build + test runner + one preview proven; short agent guide with verified commands |
-| 2. Persistence | 40 min | Message schema, DAO, repository observation, local key/client/server identity, pagination metadata, file-backed reopen check |
+| 2. Persistence | 40 min | Message schema, DAO, local observation for the next repository, local key/client/server identity, pagination metadata, file-backed reopen check |
 | 3. Reliable behavior | 65 min | Initial/older loading, deduplication, optimistic send, retry, acknowledgement merge, cancellation/restart policy; behavioral tests as implemented |
 | 4. Compose integration | 50 min | Route/screen/components/previews, scroll behavior, composer, independent error states, keyboard/system insets |
 | 5. Verification | 35 min | Unit suite, persistence reopen, activity recreation, runtime send/retry/pagination checks; fix correctness issues |

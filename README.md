@@ -2,15 +2,16 @@
 
 An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-Current milestone: project foundation. The shared welcome screen, theme, common previews, and test runner are in place. Chat persistence, sending, retry, and pagination are the next milestones; the welcome screen does not simulate them.
+Current milestone: persistence and identity. The shared Room store persists messages, delivery state, and pagination metadata, with identity reconciliation and real database tests. The app still displays the foundation welcome screen; the next milestone adds network/repository orchestration and chat UI wiring.
 
 ## Project layout
 
 - `androidApp`: Android application, package `dev.sadeghtahani.rhinochat`, API 24 minimum.
 - `shared`: Kotlin Multiplatform library with shared Compose UI and Android/iOS targets. The Android target uses `com.android.kotlin.multiplatform.library`.
+- Its JVM target runs real database tests on the development machine; there is no desktop application.
 - `iosApp`: generated SwiftUI host for the optional showcase. iOS integration is tracked separately from the required Android submission.
 
-The proposed architecture is MVVM with UDF and a repository backed by local storage. See [the roadmap](ROADMAP.md) for decisions and feature acceptance criteria, and [the research notes](docs/RESEARCH.md) for official sources.
+The proposed architecture is MVVM with UDF and a repository backed by local storage. See [persistence and identity](docs/ARCHITECTURE.md) for the implemented schema, merge rules, and package layout; [the roadmap](ROADMAP.md) for the remaining milestones; and [the research notes](docs/RESEARCH.md) for official sources.
 
 ## Build and test
 
@@ -22,15 +23,16 @@ Use the checked-in Gradle wrapper:
 ./scripts/verify
 ```
 
-This builds the debug APK, runs shared tests on the Android host, and runs Android lint. For a focused check:
+This builds the debug APK, runs shared tests on the Android host, runs file-backed database tests on the JVM, and runs Android lint. For a focused check:
 
 ```sh
 ./gradlew :androidApp:assembleDebug
 ./gradlew :shared:testAndroidHostTest
+./gradlew :shared:jvmTest
 ./gradlew :androidApp:lintDebug
 ```
 
-The current `PlatformSmokeTest` checks the common test runner and `expect`/`actual` platform wiring. It is bootstrap coverage, not coverage of the future chat behavior.
+`PlatformSmokeTest` checks the common test runner and `expect`/`actual` platform wiring. `ChatLocalStoreTest` checks real Room/SQLite behavior, including reopening a file-backed database, retry identity, duplicate merging, and transaction rollback. Network and ViewModel tests belong to the next milestone.
 
 The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Select the `androidApp` run configuration in Android Studio to launch it on an emulator or device.
 
@@ -49,6 +51,9 @@ Both light and dark previews have been visually verified in the IDE. The install
 | Kotlin / Compose compiler plugin | 2.4.21 |
 | Compose Multiplatform | 1.12.2 |
 | Material 3 | 1.9.0, stable |
+| Room / KSP | 3.0.3 / 2.3.12 |
+| Bundled SQLite | 2.7.1 |
+| Coroutines / coroutine tests | 1.11.0 |
 | Gradle daemon JDK | 21 |
 | Android minimum / compile / target SDK | 24 / 37 / 37 |
 
@@ -62,4 +67,4 @@ The repository keeps source, Gradle wrapper, Xcode project files, and shared pro
 
 [AGENTS.md](AGENTS.md) contains concise project-specific guidance. Use [validation notes](docs/VALIDATION.md) for checks actually completed and remaining limits.
 
-AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, and foundation setup/verification. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
+AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, and the persistence/identity implementation and tests. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
