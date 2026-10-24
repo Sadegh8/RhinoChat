@@ -152,6 +152,24 @@ Official guidance was read before this milestone. The stable version lookup reta
 
 Manual pagination fits this single 20-message cursor endpoint and keeps its overlap/identity rules explicit. Paging 3 is optional in the brief; introducing it is unnecessary for this milestone. Tests establish cursor advancement from the returned page, including duplicate-only pages, rather than inferring completion from unique row counts.
 
+## Compose integration and Material Expressive: 24 October 2026
+
+Read before UI implementation: [Google's Material 3 guide](https://developer.android.com/develop/ui/compose/designsystems/material3), [Material's motion physics guidance](https://m3.material.io/styles/motion), [Compose spring customization](https://developer.android.com/develop/ui/compose/animation/customize), [lazy-list keys/animations](https://developer.android.com/develop/ui/compose/lists), [inset consumption](https://developer.android.com/develop/ui/compose/system/insets-ui), and [accessible component defaults](https://developer.android.com/develop/ui/compose/accessibility/api-defaults).
+
+The IDE version lookup reports CMP Material 3 1.9.0 stable and 1.13.0-beta01 preview. [JetBrains' release notes](https://kotlinlang.org/docs/multiplatform/whats-new-compose-190.html) identify 1.9.0 as based on Jetpack Material 3 1.4.0. Inspecting the resolved 1.9.0 sources confirms `MaterialExpressiveTheme`, `MotionScheme`, and the theme's motion overload are internal. Newer Android documentation for a public API is not proof that this stable CMP artifact exposes it.
+
+Decision: retain the stable library and implement Expressive styling through shared tonal colors, emphasized typography, rounded shapes, and stable Compose animation APIs. `RhinoMotion` uses the pinned source's documented-token values: spatial damping/stiffness 0.8/380, fast spatial 0.6/800, and effects 1.0/1600. Effects do not overshoot opacity or color. Do not claim use of the official `MaterialExpressiveTheme` API. The animation dependency is explicitly declared at the existing CMP version.
+
+Use built-in Material controls and touch targets, meaningful icon descriptions, selectable message text, independent errors, and a multiline input. Avoid decorative online indicators or buttons with no real action. Add spring placement/status transitions without repeated entry animations for old cached content. Keep list observation in `snapshotFlow`/`derivedStateOf` to avoid recomposing the screen on every scroll offset.
+
+The file layout follows the user's preference over the skill's generic separate-route example: stateless screen, route, private previews/fixtures in the same file; extracted Compose components under `components`, data classes under `data`. Native iOS controls/integration remain a separate showcase.
+
+## Adaptive layouts: 24 October 2026
+
+Official guidance read before implementation: [JetBrains adaptive layouts](https://kotlinlang.org/docs/multiplatform/compose-adaptive-layouts.html), [Google window size classes](https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes), and [Google fold awareness](https://developer.android.com/develop/adaptive-apps/guides/foldables/make-your-app-fold-aware). Stable dependency lookup selected CMP adaptive 1.3.0 and Window core 1.5.1.
+
+Use `currentWindowAdaptiveInfoV2` at the route boundary, actual available window space, and separating/occluding hinge geometry in window coordinates. Compact height needs its own treatment, including landscape and keyboard space. A single conversation does not justify inventing a second feature pane: keep book chat clear of the hinge and use upper history/lower input in tabletop when both halves fit. See validation for the distinction between geometry checks, preview compilation, and device runtime evidence.
+
 ## Remaining decisions
 
 - Toolchain, previews, common metadata, build, lint, database tests, repository tests, and ViewModel tests now have [recorded evidence](VALIDATION.md).

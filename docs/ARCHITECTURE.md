@@ -1,6 +1,6 @@
 # Chat data and state ownership
 
-Persistence, repository orchestration, and the ViewModel are implemented in the shared KMP library. The Android adapter preserves the supplied fake API. The app currently displays the foundation welcome screen; chat UI wiring is next.
+Persistence, repository orchestration, the ViewModel, and chat UI are implemented in the shared KMP library. The Android adapter preserves the supplied fake API. Android opens the real chat; the optional iOS starter still requires a remote adapter and host integration.
 
 ## Packages and boundaries
 
@@ -29,7 +29,7 @@ chat/data/
       ConversationPaginationEntity.kt
 ```
 
-`chat/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` lazily constructs one repository/store/adapter/`FakeChatApi()` for the application's lifetime. The Android adapter and original API live under `shared/src/androidMain/.../chat/data/remote`; Java dependencies stay outside common code. The future route will obtain this repository through the host and construct its ViewModel with an explicit factory.
+`chat/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` lazily constructs one repository/store/adapter/`FakeChatApi()` for the application's lifetime. `MainActivity` passes that repository to shared `App`, which creates a lifecycle-owned ViewModel with an explicit initializer. `ChatRoute` collects with `collectAsStateWithLifecycle` and forwards actions. The adapter and supplied API stay in Android sources; Java APIs stay outside common code.
 
 Android and iOS provide `createChatLocalStore` factories in platform source sets. Android uses the application's database directory; iOS uses Application Support. Each platform calls its own `Room.databaseBuilder`, then applies common bundled-SQLite configuration. The store's owner closes it when that owner ends; a screen must not open a database during composition. Android's store has process lifetime. iOS still needs its own remote adapter and host wiring.
 
@@ -87,6 +87,16 @@ No pagination row means the initial page has not been saved. An existing row wit
 The fake cursor is an offset and can shift after inserts. The repository allows one history request per conversation, merges overlaps, and uses the server's returned cursor even when a page adds no new rows. Failure or cancellation before saving keeps the previous cursor. An explicit null cursor ends history.
 
 A new repository refreshes the head with a null cursor before permitting older loads; it never blindly resumes a persisted offset. Cached messages remain available if that fetch fails. The baseline has one application-owned repository and one fake-server session. Cached metadata does not turn this offset into a stable cursor; arbitrary server deletions would need a stronger backend contract.
+
+## Compose ownership and motion
+
+`ChatScreen.kt` contains stateless business-state rendering, `ChatRoute`, and private previews in that order. Scroll, focus, interaction, and animation state are local presentation concerns. The screen does not start network loads during composition: a `snapshotFlow` observes approaching the older boundary while scrolling, then dispatches a guarded ViewModel command. Failed older loads require explicit retry rather than a repeated automatic loop.
+
+The list reverses Room's oldest-first values for `reverseLayout`, placing newest at the bottom with stable `localId` keys. Older pages extend the far end. A new latest row follows the viewport only if the reader was already at the latest end; browsing history keeps its anchor and exposes an explicit jump control. The lazy state is saveable across activity recreation. Draft/request state remains in the retained ViewModel.
+
+`RhinoChatTheme` supplies shared color, typography, and shapes to production and previews. `RhinoMotion` centralizes Expressive spring values for placement/presses and non-bouncy effects for opacity/color. Stable Material 3 1.9.0 does not publicly expose the newer Expressive theme/motion types; no reflection, hidden API use, or prerelease upgrade is used. Compose's animation machinery handles the platform duration scale; there is no custom animation loop. A disabled-animation device check is separate from this implementation choice.
+
+The Android activity enables edge-to-edge and `adjustResize`. `AdaptiveChatCanvas` consumes safe-drawing insets, including the keyboard, once; its nested Scaffold uses zero native content insets and gives the list its bar padding. `ChatRoute` obtains window posture; pure `calculateChatLayout` translates hinge bounds into local coordinates, selects clear regions, caps wide content, and reduces chrome/input lines for compact height. Separating or occluding vertical hinges keep chat in one clear pane; usable tabletop halves split history and input. Layout changes reuse the same scroll and business-state owners. Platform date/time formatters keep Java/Foundation APIs out of common code.
 
 ## Schema and tests
 

@@ -24,7 +24,8 @@
 - `./scripts/verify`: debug APK, common metadata, Android host shared/adapter tests, real Room/repository and shared ViewModel tests through `:shared:jvmTest`, and Android lint. The JVM target exists for host testing, not a desktop app.
 - Room entities and DAOs are internal; expose plain models through the local store/repository. Use the Room 3 artifact/import family and retain exported schema snapshots. Do not enable destructive migration fallback.
 - Run a focused Gradle task during a change; run the affected required checks at handoff. Use the wrapper, JDK 21, and the pinned version catalog.
-- First shared previews live at the bottom of `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreen.kt`; rendering instructions are in README.
+- Chat screen previews live at the bottom of `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/ChatScreen.kt`, component previews beside their functions. The welcome screen remains the optional iOS starter. Rendering instructions are in README.
+- Stable Material 3 1.9.0 keeps the newer Expressive theme/motion types internal. Reuse `RhinoChatTheme` and `RhinoMotion`; do not introduce hidden API access or a prerelease dependency to follow a newer Android-only example.
 - Record actual results and limits in `docs/VALIDATION.md`. Bootstrap smoke tests do not establish chat correctness.
 
 ## Repository hygiene

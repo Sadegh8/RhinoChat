@@ -1,4 +1,27 @@
 <resources>
     <string name="app_name">Rhino Chat</string>
     <string name="welcome_message">Your conversation starts here.</string>
+    <string name="conversation_title">Rhino Team</string>
+    <string name="conversation_subtitle">Team conversation</string>
+    <string name="team_initial">R</string>
+    <string name="message_hint">Message the team</string>
+    <string name="send_message">Send message</string>
+    <string name="sending">Sending</string>
+    <string name="sent">Sent</string>
+    <string name="failed_retry">Failed · Retry</string>
+    <string name="retry_message">Retry message</string>
+    <string name="loading_conversation">Loading conversation…</string>
+    <string name="loading_earlier">Loading earlier messages…</string>
+    <string name="load_earlier">Load earlier messages</string>
+    <string name="history_start">You’re at the beginning</string>
+    <string name="empty_title">Start something good</string>
+    <string name="empty_body">Send the first message to your team.</string>
+    <string name="load_failed">Couldn’t load the conversation. Saved messages are still here.</string>
+    <string name="older_failed">Couldn’t load earlier messages.</string>
+    <string name="network_error">Couldn’t connect. Please try again.</string>
+    <string name="storage_error">Couldn’t save your changes. Please try again.</string>
+    <string name="identity_error">Couldn’t confirm the messages. Your saved conversation is safe.</string>
+    <string name="try_again">Try again</string>
+    <string name="dismiss_error">Dismiss error</string>
+    <string name="latest_messages">Latest messages</string>
 </resources>

@@ -1,6 +1,6 @@
 # Validation
 
-Checked on 24 October 2026 in the existing project directory. This record covers foundation, persistence/identity, repository send/retry/pagination, and shared ViewModel behavior. Chat presentation integration is next.
+Checked on 24 October 2026 in the existing project directory. This record covers foundation, persistence/identity, repository send/retry/pagination, shared ViewModel behavior, and Compose integration/previews.
 
 ## Verified results
 
@@ -88,9 +88,43 @@ The adapter tests exercise the original fake with rates 0.0 and 1.0 for determin
 
 Android Studio analysis confirms the original common Room `databaseBuilder` unresolved reference is fixed and the shared ViewModel/repository resolve. Common metadata and all affected platform compilation also pass. Room's documented generated-constructor beta warnings remain visible. Android lint has zero errors and the same six pre-existing warnings.
 
+## Compose integration and preview validation
+
+`./scripts/verify :shared:compileKotlinIosSimulatorArm64` passed for the UI milestone. Local log: `artifacts/verification/compose-validation.log`. The existing suite has 34 JVM and 11 Android-host executions: 45 total, zero failures/errors/skips. These are behavior/database/adapter tests, not automated device UI tests. Android lint still reports zero errors and the same six pre-existing warnings. Common metadata, Android APK, and shared iOS simulator compilation all pass.
+
+Android Studio analysis reports no unresolved references in `ChatScreen`, all five extracted component files, or `RhinoChatTheme`. The frequently-changing scroll-state warning was fixed with `derivedStateOf`; history observation uses `snapshotFlow`.
+
+Seven screen previews rendered and were visually inspected in Android Studio: populated light/dark, cached initial/action error, loading, empty, RTL with 1.4x text, and wide layout. They use fixed message data and no repository/clock/network. Component preview functions compile and stay beside their components; the seven screen renders exercise those same components. IDE selection/layout bounds are tooling overlays. No successful CLI preview export or iOS preview rendering is claimed.
+
+Manual checks used the connected physical Google Pixel 7 Pro, API 37, in its existing dark appearance:
+
+| Interaction | Observed result |
+| --- | --- |
+| Launch real Android chat | Supplied fake history appears, newest at the bottom, with readable Persian content, timestamps, and delivery labels |
+| Focus composer | Multiline field/send control remain entirely above the keyboard |
+| Rotate portrait → landscape → portrait | The unsent `Hello Rhino Team` draft survives activity recreation |
+| Send retained draft | One persisted row becomes sent, retaining its local/client identity and gaining `srv-120` |
+| Scroll toward older history | Automatic fetch saves cursor `40`; 40 canonical rows include the existing send and deduplicated page overlap |
+| Send while browsing history | The `109` history viewport remains in place; new send does not force-scroll |
+| Tap Latest messages | Returns to both new sent messages at the bottom |
+| Reinstall/relaunch with cache | Both sent messages remain visible; no cache purge was performed |
+| Status-bar visual check | Fixed an uncovered inset found on device; the updated header provides a solid background behind legible system icons |
+
+Screenshots/layout dumps are local under `artifacts/verification/chat-*.png` and `chat-*-layout.json`; the final visual check is `chat-final.png`. A read-only snapshot of this app's debug database confirmed persisted identity/count/cursor. Rotation was temporarily controlled for the check and restored to its original free mode afterward.
+
+Both observed device sends succeeded with the supplied default 20% failure rate. Failed/retry rendering was inspected in previews; controlled failure/retry correctness is established by the existing ViewModel/repository/adapter tests. A failed-send retry was not observed on the physical device in this pass. No release performance measurement, TalkBack session, or disabled-animation runtime check is claimed.
+
+## Adaptive layout validation and review findings
+
+`./scripts/verify :shared:compileKotlinIosSimulatorArm64` passed after the adaptive extension. Local log: `artifacts/verification/adaptive-validation.log`. There were 48 JVM and 25 Android-host executions: 73 total, 51 distinct cases, zero failures/errors/skips. Fourteen new layout cases run on both targets and cover sizing thresholds, density, compact height, large text, book/tabletop hinges, RTL selection, window-coordinate translation, and keyboard-constrained regions. Android APK, common metadata, shared iOS simulator Kotlin compilation, and lint passed; lint retains zero errors and six existing warnings.
+
+A physical Pixel 7 Pro landscape screenshot was inspected for compact chrome, readable input, and cutout/gesture clearance. The final twelve-preview matrix compiles; not every adaptive preview was visually inspected. Tablet/foldable emulator runtime checks could not proceed because the available disk space was below the emulator userdata requirement. The attempted keyboard screenshot changed orientation and does not establish adaptive landscape keyboard behavior. Rotation was restored to automatic mode. No additional tests were run after the user requested stopping further testing.
+
+Subsequent user review reported that scrolling to the oldest loaded message does not reliably fetch more history, loading feedback flashes, and new sends repeatedly fail with an identity error after earlier successful sends. These are open acceptance issues, despite the passing automated checks and the earlier successful manual scenarios. The next milestone must investigate automatic history triggering and the fake server's reused IDs after process restart without clearing cached messages or changing the supplied fake.
+
 ## Remaining scope
 
-- No emulator/device app launch was performed in this milestone.
 - The SwiftUI iOS host was not built, linked, launched, or tested in a simulator. Shared Kotlin/Native compilation is a narrower result.
-- The supplied fake/adapter and application-owned repository are implemented; the shared ViewModel is tested. The route/chat UI is not wired yet, so no visible chat interaction or device rotation is claimed. The welcome screen is unchanged.
+- Android's chat UI is wired; the optional iOS host deliberately remains on the welcome starter until it has a platform remote adapter and host integration.
+- Remaining Android acceptance/handoff work includes a broader device failure/retry flow, accessibility checks, and final walkthrough/time disclosure. Process-death draft restoration and background retry remain optional.
 - The repository is local; no remote repository has been created or pushed.

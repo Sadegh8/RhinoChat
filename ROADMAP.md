@@ -1,6 +1,6 @@
 # Rhino chat challenge: review and implementation roadmap
 
-Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. CMP foundation is verified; persistence and identity are implemented for user review. Network orchestration and chat presentation remain subsequent work.
+Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. Foundation, persistence, and reliable behavior are committed. Compose chat integration and previews are implemented for review; final acceptance checks/handoff remain.
 
 The workspace was empty at review time. This document separates the employer's brief, current documentation, and our engineering decisions. Documentation findings and official source links are in [RESEARCH.md](docs/RESEARCH.md).
 
@@ -59,8 +59,8 @@ shared/                            KMP library; Android + iOS compilation target
   src/commonMain/kotlin/.../
     chat/
       ChatViewModel.kt
-      ChatScreen.kt                Next: stateless screen, stateful route, then previews
-      components/                  Next: bubbles, composer, history status
+      ChatScreen.kt                Stateless screen, stateful route, then private previews
+      components/                  Bubbles, composer, history status, header, action errors
       data/                        Plain message/page/status models
         ChatUiState.kt
         repository/
@@ -70,7 +70,7 @@ shared/                            KMP library; Android + iOS compilation target
           data/                    Internal persistence entities
         remote/                    Platform-neutral remote contract and transport values
     theme/                         Shared theme and resources
-  src/commonTest/                   Shared tests and future deterministic state tests
+  src/commonTest/                   Shared ViewModel/state and platform smoke tests
   src/jvmTest/                      Real Room/SQLite file-backed database tests
   src/androidMain/                 Database factory, Android adapter, original supplied API
   src/iosMain/                     Database construction when iOS is exercised
@@ -175,7 +175,9 @@ Foundation progress on 24 October: the Android build, shared host test runner, l
 
 Persistence progress: Room schema version 1, plain external models, stable local/client/server identities, local `Flow` observation, transactional acknowledgement/history merging, and persisted cursor metadata are implemented. Real database tests run on a JVM test target within `shared`. The user has reviewed and approved committing this milestone. See [the implemented model](docs/ARCHITECTURE.md).
 
-Reliable-behavior progress: the supplied Android fake and adapter, application-owned repository, shared ViewModel, optimistic send/retry, serialized history loading, cancellation/restart recovery, and correctness tests are implemented. No dependency update was needed after stable-version checks. Chat UI wiring is next; this milestone remains uncommitted for review. See [validation](docs/VALIDATION.md) for the actual checks and limits.
+Reliable-behavior progress: the supplied Android fake and adapter, application-owned repository, shared ViewModel, optimistic send/retry, serialized history loading, cancellation/restart recovery, and correctness tests are committed as `3421ebd` after user approval.
+
+Compose integration progress: Android now opens the real chat. Shared rendering, lifecycle collection, message/composer/history components, theme, spring transitions, insets, dates, stable scroll keys, explicit jump/load/retry actions, and twelve screen previews are implemented. Adaptive window/hinge layouts cover phone landscape, tablets, book fold, tabletop, and short keyboard space. User review has identified repeated send conflicts and unreliable automatic older loading; resolving those is the next correctness milestone. See [validation](docs/VALIDATION.md) for actual device/preview evidence and limits.
 
 Tests are added alongside each behavior; the verification allocation completes the integration checks. These estimates assume a functioning local Android toolchain and cached dependencies.
 

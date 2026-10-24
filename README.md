@@ -2,7 +2,7 @@
 
 An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-Current milestone: send/retry and pagination correctness. The shared repository and ViewModel support optimistic sends, persisted retry identity, independent history errors, and overlapping offset pages. The app still displays the foundation welcome screen; the next milestone connects this behavior to the chat UI.
+Current milestone: Compose integration, previews, and adaptive layouts. Android opens a conversation backed by Room and the supplied fake API, with optimistic sends, retry, older history, keyboard handling, and shared previews. User review has identified repeated send failures after restart and unreliable automatic older loading; these remain open correctness issues for the next milestone. The optional iOS host still displays the foundation screen pending its own remote integration.
 
 ## Project layout
 
@@ -44,11 +44,17 @@ The application owns one repository/store/fake API instance; the ViewModel owns 
 
 The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Select the `androidApp` run configuration in Android Studio to launch it on an emulator or device.
 
-## First previews
+## Chat UI and previews
 
-Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreen.kt` in Android Studio and select Split or Design. The file is ordered: stateless screen, resource-owning route, then private light/dark previews. The welcome route has no business state yet; future stateful screen entry points follow the same placement. Both previews use the same `RhinoChatTheme` and stateless `WelcomeScreen` as the application, with common string resources and no network or dependency injection.
+Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/ChatScreen.kt` in Android Studio and select Split or Design. It is ordered: stateless `ChatScreen`, lifecycle-aware `ChatRoute`, then private previews and fixtures. The host creates one ViewModel through the lifecycle factory. Substantial bubbles, composer, history status, header, and action-error UI live in `chat/components`; their previews stay beside the component.
 
-Both light and dark previews have been visually verified in the IDE. The installed Android CLI exporter currently fails to export these common previews, so use the IDE preview panel; see [validation notes](docs/VALIDATION.md). Generated artifacts and logs under `artifacts/` are ignored. Android-backed previews do not verify iOS runtime behavior.
+The twelve screen previews cover light/dark, cached errors, loading, empty, RTL with larger text, tablet portrait/landscape, phone landscape, a short keyboard viewport, book fold, and tabletop using the real `RhinoChatTheme` and fixed data. The original seven variants were rendered and visually inspected before the adaptive extension; the final twelve-variant set compiles but has not all been visually inspected. The CLI preview exporter remains unreliable, so use the IDE panel; see [validation notes](docs/VALIDATION.md). Preview callbacks are intentionally inert; the application uses real ViewModel callbacks. Android-backed previews do not verify iOS runtime behavior.
+
+The shared design uses lavender tonal containers, contrasting delivery/error states, asymmetric rounded bubbles, selectable text, platform-localized dates/times, and a multiline composer. New rows and delivery labels animate; the send button responds with a small spring/shape change. The latest-message button appears when browsing history. Message keys preserve the scroll anchor across older-page merges; automatic older loads run while approaching history during a scroll, with an explicit load/retry button as an accessible alternative.
+
+Adaptive layout uses available window dimensions and separating/occluding hinge bounds. Wide windows center a bounded conversation; compact height reduces chrome and composer lines. Book posture keeps the conversation clear of the hinge; tabletop places history above and input below when space permits. The adaptive canvas owns safe-drawing/keyboard insets. Physical phone landscape was inspected; tablet/foldable emulator runtime verification is blocked by local disk space.
+
+Stable CMP Material 3 1.9.0 keeps `MaterialExpressiveTheme` and `MotionScheme` internal. This project applies Expressive design and spring-token guidance through stable Material/animation APIs rather than adopting a preview dependency or accessing internals. [Research and compatibility rationale](docs/RESEARCH.md). Google Material Symbols are vendored as six small vectors with their [Apache 2.0 license](docs/licenses/material-symbols.txt).
 
 ## Pinned toolchain
 
@@ -59,6 +65,7 @@ Both light and dark previews have been visually verified in the IDE. The install
 | Kotlin / Compose compiler plugin | 2.4.21 |
 | Compose Multiplatform | 1.12.2 |
 | Material 3 | 1.9.0, stable |
+| Material 3 adaptive / Window core | 1.3.0 / 1.5.1 |
 | Room / KSP | 3.0.3 / 2.3.12 |
 | Bundled SQLite | 2.7.1 |
 | Coroutines / coroutine tests | 1.11.0 |
@@ -75,4 +82,4 @@ The repository keeps source, Gradle wrapper, Xcode project files, and shared pro
 
 [AGENTS.md](AGENTS.md) contains concise project-specific guidance. Use [validation notes](docs/VALIDATION.md) for checks actually completed and remaining limits.
 
-AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, and automated verification. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
+AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, Compose integration, previews, device interaction checks, and automated verification. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
