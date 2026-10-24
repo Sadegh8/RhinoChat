@@ -1,6 +1,6 @@
 # Validation
 
-Checked on 24 October 2026 in the existing project directory. This record covers the CMP foundation and persistence/identity layer. Network orchestration and chat presentation are subsequent milestones.
+Checked on 24 October 2026 in the existing project directory. This record covers foundation, persistence/identity, repository send/retry/pagination, and shared ViewModel behavior. Chat presentation integration is next.
 
 ## Verified results
 
@@ -66,9 +66,31 @@ Kotlin reports beta `expect`/`actual` class warnings for Room's documented gener
 
 The user approved committing this milestone. Platform-specific Room builder creation was corrected after IDE diagnostics found `databaseBuilder` unresolved in common code. Common metadata compilation is now part of the verification script, in addition to platform builds.
 
+## Send/retry and pagination validation
+
+The full command `./scripts/verify :shared:compileKotlinIosSimulatorArm64` passed. Local log: `artifacts/verification/send-validation.log`. It includes common metadata compilation, Android debug APK, both host test runners, lint, and shared iOS simulator Kotlin compilation.
+
+| Suite | Result |
+| --- | --- |
+| File-backed local store | 11 tests passed |
+| File-backed repository with scripted transport | 15 tests passed |
+| Shared ViewModel | 7 tests passed on JVM and the same 7 on Android host |
+| Actual supplied fake and Android adapter | 3 tests passed |
+| Platform smoke | 1 passed on each runner |
+
+Total: 45 test executions (37 distinct cases), zero failures/errors/skips. The shared cases run on both host targets; this count does not represent device UI tests.
+
+Repository tests cover local optimism before a delayed response, failure then coalesced retry, stable client identity after a lost response, acknowledgement/history races, cancellation during enqueue and remote delivery, claim cleanup, one-time interrupted-send recovery, reopen retry, head/older request coalescing, cursor preservation on failure/cancellation, 120 historical messages plus an inserted send without gaps/duplicates, duplicate-only pages, fresh-session head refresh, and fake reset conflicts.
+
+ViewModel tests cover collector-independent initial loading, draft retention on recollection, independent history errors with cached data, rapid send coalescing during local persistence, retaining newer edits even when text is identical, another send while the first awaits network, failed local writes, explicit retry, and persisted delivery failures. Tests use a controlled Main dispatcher and virtual time. A test teardown issue was corrected by draining ViewModel cancellation before resetting Main.
+
+The adapter tests exercise the original fake with rates 0.0 and 1.0 for deterministic cases. The application still constructs `FakeChatApi()` with its supplied default 0.2; the fake's behavior is unchanged. The extra lost-response scenario is a scripted robustness test, not a claim that the supplied fake fails after committing.
+
+Android Studio analysis confirms the original common Room `databaseBuilder` unresolved reference is fixed and the shared ViewModel/repository resolve. Common metadata and all affected platform compilation also pass. Room's documented generated-constructor beta warnings remain visible. Android lint has zero errors and the same six pre-existing warnings.
+
 ## Remaining scope
 
 - No emulator/device app launch was performed in this milestone.
 - The SwiftUI iOS host was not built, linked, launched, or tested in a simulator. Shared Kotlin/Native compilation is a narrower result.
-- The original fake API, repository/network orchestration, and chat UI are not integrated yet. The welcome screen is unchanged; persistence is currently exercised through its real database tests.
+- The supplied fake/adapter and application-owned repository are implemented; the shared ViewModel is tested. The route/chat UI is not wired yet, so no visible chat interaction or device rotation is claimed. The welcome screen is unchanged.
 - The repository is local; no remote repository has been created or pushed.

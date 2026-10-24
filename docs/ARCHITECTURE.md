@@ -1,6 +1,6 @@
-# Persistence and message identity
+# Chat data and state ownership
 
-Implemented in the shared KMP library. Network orchestration, ViewModels, and the chat UI are subsequent milestones; the app currently displays the foundation welcome screen.
+Persistence, repository orchestration, and the ViewModel are implemented in the shared KMP library. The Android adapter preserves the supplied fake API. The app currently displays the foundation welcome screen; chat UI wiring is next.
 
 ## Packages and boundaries
 
@@ -11,8 +11,16 @@ chat/data/
   RemoteMessage.kt                  Platform-neutral input for server reconciliation
   MessagePage.kt
   PaginationState.kt
+  ChatUiState.kt                    Screen state, independent history load states
+  ChatOperationResult.kt            Completed, ignored, or expected failure
+  ChatError.kt                      Shared errors; no Android exceptions in presentation
+  repository/
+    ChatRepository.kt              Presentation's observation/command boundary
+    OfflineFirstChatRepository.kt   Sends, retry claims, history requests and startup recovery
+  remote/
+    ChatRemoteDataSource.kt         Platform-neutral remote boundary
   local/
-    ChatDatabase.kt                 Internal Room database, constructor, common builder
+    ChatDatabase.kt                 Internal Room database, constructor, common configuration
     ChatMessageDao.kt               Internal SQL operations and database observations
     ChatLocalStore.kt               Local transactions and mapping to external models
     MessageIdentityConflictException.kt
@@ -21,9 +29,11 @@ chat/data/
       ConversationPaginationEntity.kt
 ```
 
-Android and iOS provide `createChatLocalStore` factories in their platform source sets. Android uses the application's database directory. iOS uses Application Support. Both configure the common database with bundled SQLite. A future application composition root should own/reuse the store and close it when its owner ends; a screen must not open a new database during composition.
+`chat/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` lazily constructs one repository/store/adapter/`FakeChatApi()` for the application's lifetime. The Android adapter and original API live under `shared/src/androidMain/.../chat/data/remote`; Java dependencies stay outside common code. The future route will obtain this repository through the host and construct its ViewModel with an explicit factory.
 
-`ChatLocalStore` is the local data-source boundary, not a network repository. It exposes plain `ChatMessage` values through `Flow` and keeps Room entities internal. The next repository can combine the supplied API with this store without giving the ViewModel access to a DAO. This follows the entity-to-external-model separation in [Now in Android's offline-first repository](https://github.com/android/nowinandroid/blob/main/core/data/src/main/kotlin/com/google/samples/apps/nowinandroid/core/data/repository/OfflineFirstTopicsRepository.kt).
+Android and iOS provide `createChatLocalStore` factories in platform source sets. Android uses the application's database directory; iOS uses Application Support. Each platform calls its own `Room.databaseBuilder`, then applies common bundled-SQLite configuration. The store's owner closes it when that owner ends; a screen must not open a database during composition. Android's store has process lifetime. iOS still needs its own remote adapter and host wiring.
+
+`ChatLocalStore` exposes plain `ChatMessage` values through `Flow` and keeps Room entities internal. `OfflineFirstChatRepository` combines the supplied API with this store without giving the ViewModel access to a DAO. This follows the entity-to-external-model separation in [Now in Android's offline-first repository](https://github.com/android/nowinandroid/blob/main/core/data/src/main/kotlin/com/google/samples/apps/nowinandroid/core/data/repository/OfflineFirstTopicsRepository.kt).
 
 For screens, keep stateless rendering, the stateful entry point, and previews in the same file in that order. Put feature data classes in `data` and extracted Compose functions in `components`. Promote shared types/components to `common/data` or `common/components` when a second feature needs them; create no empty common packages or speculative abstractions.
 
@@ -37,7 +47,7 @@ For screens, keep stateless rendering, the stateful entry point, and previews in
 
 Unique indexes enforce `(conversationId, clientId)` and `(conversationId, serverId)` when the corresponding identity is non-null. SQLite permits multiple nulls, so multiple pending messages and historical messages without client IDs can coexist.
 
-Identical text is not an identity. Two deliberate sends of the same text create two local/client IDs. Message observations sort oldest first by `createdAtMillis`, then `localId`, making equal-time ordering deterministic. Timestamp values are epoch milliseconds supplied by the caller; a future repository owns its clock.
+Identical text is not an identity. Two deliberate sends of the same text create two local/client IDs. Message observations sort oldest first by `createdAtMillis`, then `localId`, making equal-time ordering deterministic. The repository accepts an injectable stable Kotlin `Clock` for outgoing timestamps.
 
 ## Persisted operations
 
@@ -56,13 +66,27 @@ The merge first finds a row by client identity, then server identity. When both 
 
 The supplied fake treats messages as immutable. Reusing an established identity for different client identity, server identity, text, or sender is reported as `MessageIdentityConflictException`. A page conflict rolls back all rows and the cursor together; no cached message is silently replaced.
 
-The fake loses its server state on process restart and can reuse server IDs. This client detects conflicting identities but cannot preserve server-side idempotency across a server reset. A future repository must surface the conflict and preserve cached messages. Supporting editable server messages or a server-session namespace would require an explicit reconciliation policy beyond the supplied fake's contract.
+The fake loses its server state on process restart and can reuse server IDs. The repository reports `IDENTITY_CONFLICT` and preserves cached messages; it cannot preserve server-side idempotency across a server reset. Supporting editable server messages or a server-session namespace would require an explicit policy beyond this fake's contract.
+
+## Send lifecycle and state production
+
+The ViewModel exposes immutable `StateFlow<ChatUiState>` from repository observations, its draft, and operation state. Sharing uses `WhileSubscribed(5_000)`; initial loading starts in the ViewModel once, independently of collectors. A rotation must reuse the same ViewModel. A new draft edit increments a version, so even retyping identical text during a pending local write prevents the old send from clearing that new draft.
+
+Local enqueue completes before sending remotely. The short enqueue guard coalesces duplicate taps but releases before the network call, allowing another deliberate message while an earlier send waits. Room updates the delivery status. The ViewModel holds no second mutable message list. Initial-load, older-load, and row delivery failures are independent; a history error retains cached chat.
+
+Repository request sets coalesce work per outgoing row and per conversation. Their mutex covers claims only, never network I/O. Retry also uses the database's conditional failed-to-sending update. A late failure checks the persisted state: if history already confirmed the row, it remains sent.
+
+Suspend commands use caller-owned structured concurrency (`viewModelScope` in presentation). Cancellation is rethrown after a short non-cancellable status/claim cleanup; it is never turned into a network failure. Enqueue cleanup uses the already-created client identity if a commit precedes cancellation of its return, so that row becomes retryable even when its local key never reached the caller. Before the first command, one initialization lock recovers sending rows left by the prior process. Recovery is not repeated while new sends are active. Process termination is handled by startup recovery; no closed-app completion or automatic retry is promised.
+
+The adapter maps `IOException` to a shared network error. The repository separately maps SQLite failures and identity conflicts; unexpected programming errors are allowed to fail visibly. Errors loading history are returned to the ViewModel; network send failures appear on the persisted bubble. Storage/identity send errors also expose an action error.
 
 ## Pagination persistence
 
 No pagination row means the initial page has not been saved. An existing row with `nextCursor = null` means a successful fetch reached the end, including an empty conversation. Page data and its cursor are committed together.
 
-The fake cursor is an offset and can shift after inserts. The next repository must serialize history requests and merge overlaps. On a new fake-server session, refresh the head using a null cursor rather than blindly resuming an old persisted offset. Cached metadata is useful for offline state, but does not turn the server's offset into a stable cursor.
+The fake cursor is an offset and can shift after inserts. The repository allows one history request per conversation, merges overlaps, and uses the server's returned cursor even when a page adds no new rows. Failure or cancellation before saving keeps the previous cursor. An explicit null cursor ends history.
+
+A new repository refreshes the head with a null cursor before permitting older loads; it never blindly resumes a persisted offset. Cached messages remain available if that fetch fails. The baseline has one application-owned repository and one fake-server session. Cached metadata does not turn this offset into a stable cursor; arbitrary server deletions would need a stronger backend contract.
 
 ## Schema and tests
 

@@ -2,7 +2,7 @@
 
 An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-Current milestone: persistence and identity. The shared Room store persists messages, delivery state, and pagination metadata, with identity reconciliation and real database tests. The app still displays the foundation welcome screen; the next milestone adds network/repository orchestration and chat UI wiring.
+Current milestone: send/retry and pagination correctness. The shared repository and ViewModel support optimistic sends, persisted retry identity, independent history errors, and overlapping offset pages. The app still displays the foundation welcome screen; the next milestone connects this behavior to the chat UI.
 
 ## Project layout
 
@@ -11,7 +11,7 @@ Current milestone: persistence and identity. The shared Room store persists mess
 - Its JVM target runs real database tests on the development machine; there is no desktop application.
 - `iosApp`: generated SwiftUI host for the optional showcase. iOS integration is tracked separately from the required Android submission.
 
-The proposed architecture is MVVM with UDF and a repository backed by local storage. See [persistence and identity](docs/ARCHITECTURE.md) for the implemented schema, merge rules, and package layout; [the roadmap](ROADMAP.md) for the remaining milestones; and [the research notes](docs/RESEARCH.md) for official sources.
+The architecture is MVVM with UDF and a repository backed by local storage. See [architecture](docs/ARCHITECTURE.md) for state ownership, identity, retry, and pagination rules; [the roadmap](ROADMAP.md) for remaining milestones; and [the research notes](docs/RESEARCH.md) for official sources.
 
 ## Build and test
 
@@ -23,7 +23,7 @@ Use the checked-in Gradle wrapper:
 ./scripts/verify
 ```
 
-This builds the debug APK, runs shared tests on the Android host, runs file-backed database tests on the JVM, and runs Android lint. For a focused check:
+This builds the debug APK, compiles common metadata, runs shared/adapter tests on the Android host, runs file-backed database/repository tests on the JVM, and runs Android lint. For a focused check:
 
 ```sh
 ./gradlew :androidApp:assembleDebug
@@ -32,7 +32,15 @@ This builds the debug APK, runs shared tests on the Android host, runs file-back
 ./gradlew :androidApp:lintDebug
 ```
 
-`PlatformSmokeTest` checks the common test runner and `expect`/`actual` platform wiring. `ChatLocalStoreTest` checks real Room/SQLite behavior, including reopening a file-backed database, retry identity, duplicate merging, and transaction rollback. Network and ViewModel tests belong to the next milestone.
+`ChatLocalStoreTest` checks real Room/SQLite persistence and transactions. `OfflineFirstChatRepositoryTest` adds delayed sends, failure/retry, lost acknowledgements, cancellation, restart, and overlapping history. Common `ChatViewModelTest` checks draft ownership and independent loading/delivery state on both runners. `AndroidChatRemoteDataSourceTest` exercises the actual supplied fake with deterministic failures and virtual time. `PlatformSmokeTest` checks platform wiring. See [actual results](docs/VALIDATION.md).
+
+## Send, retry, and history
+
+Room is the source of messages. Sending first commits a row with a new UUID and `SENDING`; the ViewModel then clears only the submitted draft and calls the remote API. Acknowledgement merges into the same local key and sets `SENT`. Expected failure leaves `FAILED`; retry claims that row and reuses its persisted UUID/text. Repeated retry taps share one in-flight attempt.
+
+History requests fetch 20 at a time, with one request per conversation. Each page merges by identity and commits its returned cursor in the same transaction. Duplicate-only pages still advance; failures retain the cache and cursor. A fresh repository refreshes from the head before using any saved offset.
+
+The application owns one repository/store/fake API instance; the ViewModel owns request lifetimes. Cancellation propagates and in-flight sends become retryable. A new repository recovers interrupted sending rows before its first command. There is no background sender or process-death draft restoration. The supplied fake remains at its default 20% failure rate; its in-memory server resets across process restarts and can reuse server IDs. Conflicting cached identities are preserved and reported rather than overwritten. Exactly-once delivery across a fake-server reset is outside the server's guarantees.
 
 The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Select the `androidApp` run configuration in Android Studio to launch it on an emulator or device.
 
@@ -67,4 +75,4 @@ The repository keeps source, Gradle wrapper, Xcode project files, and shared pro
 
 [AGENTS.md](AGENTS.md) contains concise project-specific guidance. Use [validation notes](docs/VALIDATION.md) for checks actually completed and remaining limits.
 
-AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, and the persistence/identity implementation and tests. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
+AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, and automated verification. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.

@@ -16,11 +16,12 @@
 - Use common string resources and deterministic, I/O-free previews. A compiled preview is not proof it rendered; an Android-backed preview is not iOS verification.
 - For future chat work, persist outgoing client identity before remote I/O, reuse it on retry, and merge acknowledgements/history into the canonical local rows.
 - Keep initial/history errors separate from delivery state. Preserve coroutine cancellation; do not swallow it in broad exception wrappers.
+- Reuse one application-owned repository/store/fake instance. Commands remain caller-scoped; never run startup recovery during active sends. A fresh repository must refresh the history head before loading older saved offsets.
 - Preserve the supplied fake API unchanged in Android code when it is introduced. The fake's in-memory reset and simulated failures need explicit tests/documentation.
 
 ## Checks
 
-- `./scripts/verify`: debug APK, Android host smoke tests, real Room tests through `:shared:jvmTest`, and Android lint. The JVM target exists for database testing, not a desktop app.
+- `./scripts/verify`: debug APK, common metadata, Android host shared/adapter tests, real Room/repository and shared ViewModel tests through `:shared:jvmTest`, and Android lint. The JVM target exists for host testing, not a desktop app.
 - Room entities and DAOs are internal; expose plain models through the local store/repository. Use the Room 3 artifact/import family and retain exported schema snapshots. Do not enable destructive migration fallback.
 - Run a focused Gradle task during a change; run the affected required checks at handoff. Use the wrapper, JDK 21, and the pinned version catalog.
 - First shared previews live at the bottom of `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreen.kt`; rendering instructions are in README.

@@ -136,10 +136,26 @@ Anthropic recommends concise persistent instructions, on-demand skills, focused 
 
 Project decision: a short guide, repeatable verification, and accurate results are more useful here than elaborate orchestration. Keep the interview disclosure factual and make every generated change understandable to its author.
 
-## Outstanding decisions for the build phase
+## Send/retry and pagination: implementation check, 24 October 2026
 
-- Verify the exact stable toolchain, SDKs, preview configuration, and test task names on this machine. None has been validated by this planning pass.
-- Implement and test the fake-server reset/identity collision policy without changing the supplied fake.
+Official guidance was read before this milestone. The stable version lookup retained Kotlin 2.4.21, CMP 1.12.2, shared Lifecycle 2.11.0, coroutines/test 1.11.0, Room 3.0.3, SQLite 2.7.1, and KSP 2.3.12. This milestone needs no added library. AGP stays at the compatible 9.1.1 for the installed IDE; see [validation](VALIDATION.md).
+
+| Official source | Application here |
+| --- | --- |
+| [Google: offline-first data layer](https://developer.android.com/topic/architecture/data-layer/offline-first) | Room remains canonical; enqueue locally before remote delivery and expose local observations. |
+| [Google: coroutine best practices](https://developer.android.com/kotlin/coroutines/coroutines-best-practices) | Caller-owned structured work, narrow expected-error handling, cancellation propagation, injected/test-controlled dependencies. No background completion claim. |
+| [Google: state production](https://developer.android.com/topic/architecture/ui-layer/state-production) | Combine local streams with draft/operation state; use `stateIn` and `WhileSubscribed(5_000)`. Start the initial command in the ViewModel, not a collector. |
+| [Google: testing StateFlow](https://developer.android.com/kotlin/flow/test) | Keep a collector active in tests for subscription-based state. Override Main and finish ViewModel cancellation before resetting it. |
+| [JetBrains: shared ViewModel](https://kotlinlang.org/docs/multiplatform/compose-viewmodel.html) | Common ViewModel with explicit dependencies; platform host factory will wire it into Compose. |
+| [Kotlin: stable Clock](https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.time/-clock/) | Inject `kotlin.time.Clock` for deterministic outgoing timestamps. |
+| [Coroutines: Mutex](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.sync/-mutex/) | Short synchronized request claims; never hold a database transaction or request mutex across remote work. |
+
+Manual pagination fits this single 20-message cursor endpoint and keeps its overlap/identity rules explicit. Paging 3 is optional in the brief; introducing it is unnecessary for this milestone. Tests establish cursor advancement from the returned page, including duplicate-only pages, rather than inferring completion from unique row counts.
+
+## Remaining decisions
+
+- Toolchain, previews, common metadata, build, lint, database tests, repository tests, and ViewModel tests now have [recorded evidence](VALIDATION.md).
+- The fake-server identity collision policy is implemented and tested: preserve cached identities and surface a conflict. A server-session namespace remains a larger extension.
 - Keep functional iOS integration separately scoped; decide whether an equivalent iOS fake is acceptable if it will be submitted for assessment.
 - The user confirmed a 3–4 hour submission plus an optional, separately tracked showcase. The exact receipt-based deadline remains unconfirmed.
-- Create real run/test instructions only after the commands have succeeded; avoid presenting guessed Gradle tasks as verified commands.
+- Validate actual chat UI behavior and activity recreation after Compose integration. Test-level state recollection is narrower evidence than rotating a device.

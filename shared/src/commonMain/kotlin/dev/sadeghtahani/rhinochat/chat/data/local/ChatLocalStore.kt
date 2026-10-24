@@ -9,13 +9,16 @@ import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationPaginationEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.MessageEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.asExternalModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-/** Local source of truth. Network orchestration belongs in the repository added next. */
+/** Local source of truth. Network orchestration belongs in the repository. */
 @OptIn(ExperimentalUuidApi::class)
 class ChatLocalStore internal constructor(
     private val database: ChatDatabase,
@@ -52,7 +55,21 @@ class ChatLocalStore internal constructor(
             createdAtMillis = createdAtMillis,
             deliveryStatus = DeliveryStatus.SENDING,
         )
-        return entity.copy(localId = dao.insert(entity)).asExternalModel()
+        return try {
+            entity.copy(localId = dao.insert(entity)).asExternalModel()
+        } catch (cancelled: CancellationException) {
+            // A commit may precede prompt cancellation of the insert's return to its caller.
+            withContext(NonCancellable) {
+                try {
+                    dao.findByClientId(conversationId, requireNotNull(entity.clientId))?.let {
+                        dao.markFailed(conversationId, it.localId)
+                    }
+                } catch (cleanupFailure: Exception) {
+                    cancelled.addSuppressed(cleanupFailure)
+                }
+            }
+            throw cancelled
+        }
     }
 
     /** Writes history and its cursor atomically, including pages containing only duplicates. */

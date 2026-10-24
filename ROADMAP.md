@@ -52,32 +52,27 @@ The provided implementation imports `java.io.IOException` and calls `System.curr
 
 ```text
 androidApp/                         Android application / packaging / composition root
-  supplied/                        Original ChatApi, DTOs, FakeChatApi
-  remote/                          Adapter from supplied API to shared remote contract
   MainActivity.kt
+  RhinoChatApplication.kt           One application-owned repository/store/fake
 
 shared/                            KMP library; Android + iOS compilation targets
   src/commonMain/kotlin/.../
     chat/
+      ChatViewModel.kt
+      ChatScreen.kt                Next: stateless screen, stateful route, then previews
+      components/                  Next: bubbles, composer, history status
       data/                        Plain message/page/status models
-        ChatRepository.kt          Contract used by presentation
-        DefaultChatRepository.kt   Local writes, remote orchestration, reconciliation
+        ChatUiState.kt
+        repository/
+          ChatRepository.kt        Contract used by presentation
+          OfflineFirstChatRepository.kt
         local/                     Room database, DAO, transactions, local observation
           data/                    Internal persistence entities
         remote/                    Platform-neutral remote contract and transport values
-      presentation/
-        ChatViewModel.kt
-        ChatUiState.kt
-        ChatAction.kt              Only if a sealed action API improves clarity
-        ChatScreen.kt              Stateless screen, stateful route, then previews/fixtures
-        components/
-          MessageBubble.kt
-          MessageComposer.kt
-          HistoryLoadStatus.kt
     theme/                         Shared theme and resources
   src/commonTest/                   Shared tests and future deterministic state tests
   src/jvmTest/                      Real Room/SQLite file-backed database tests
-  src/androidMain/                 Database construction and necessary Android adapters
+  src/androidMain/                 Database factory, Android adapter, original supplied API
   src/iosMain/                     Database construction when iOS is exercised
 
 iosApp/                            Optional native host; add in the extension phase
@@ -179,6 +174,8 @@ Use the supported `androidx.compose.ui.tooling.preview.Preview` setup for the se
 Foundation progress on 24 October: the Android build, shared host test runner, lint, common light/dark IDE previews, and shared iOS simulator Kotlin compilation are verified. Local Git and ignore rules are initialized. See [validation evidence and limits](docs/VALIDATION.md). The supplied API/adapter will be introduced with the data implementation; this milestone does not claim working chat behavior.
 
 Persistence progress: Room schema version 1, plain external models, stable local/client/server identities, local `Flow` observation, transactional acknowledgement/history merging, and persisted cursor metadata are implemented. Real database tests run on a JVM test target within `shared`. The user has reviewed and approved committing this milestone. See [the implemented model](docs/ARCHITECTURE.md).
+
+Reliable-behavior progress: the supplied Android fake and adapter, application-owned repository, shared ViewModel, optimistic send/retry, serialized history loading, cancellation/restart recovery, and correctness tests are implemented. No dependency update was needed after stable-version checks. Chat UI wiring is next; this milestone remains uncommitted for review. See [validation](docs/VALIDATION.md) for the actual checks and limits.
 
 Tests are added alongside each behavior; the verification allocation completes the integration checks. These estimates assume a functioning local Android toolchain and cached dependencies.
 
