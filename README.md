@@ -1,31 +1,65 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# Rhino Chat
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+Current milestone: project foundation. The shared welcome screen, theme, common previews, and test runner are in place. Chat persistence, sending, retry, and pagination are the next milestones; the welcome screen does not simulate them.
 
-### Running the apps
+## Project layout
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+- `androidApp`: Android application, package `dev.sadeghtahani.rhinochat`, API 24 minimum.
+- `shared`: Kotlin Multiplatform library with shared Compose UI and Android/iOS targets. The Android target uses `com.android.kotlin.multiplatform.library`.
+- `iosApp`: generated SwiftUI host for the optional showcase. iOS integration is tracked separately from the required Android submission.
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+The proposed architecture is MVVM with UDF and a repository backed by local storage. See [the roadmap](ROADMAP.md) for decisions and feature acceptance criteria, and [the research notes](docs/RESEARCH.md) for official sources.
 
-### Running tests
+## Build and test
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+Open this directory in Android Studio and let Gradle sync. Use JDK 21 and Android SDK 37 with the existing SDK licenses accepted. Android Studio can create `local.properties` for your machine; it is intentionally ignored by Git.
 
-- Android tests: `./gradlew :shared:testAndroidHostTest`
-- iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
+Use the checked-in Gradle wrapper:
 
----
+```sh
+./scripts/verify
+```
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+This builds the debug APK, runs shared tests on the Android host, and runs Android lint. For a focused check:
+
+```sh
+./gradlew :androidApp:assembleDebug
+./gradlew :shared:testAndroidHostTest
+./gradlew :androidApp:lintDebug
+```
+
+The current `PlatformSmokeTest` checks the common test runner and `expect`/`actual` platform wiring. It is bootstrap coverage, not coverage of the future chat behavior.
+
+The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Select the `androidApp` run configuration in Android Studio to launch it on an emulator or device.
+
+## First previews
+
+Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/welcome/WelcomeScreenPreview.kt` in Android Studio and select Split or Design. Both previews use the same `RhinoChatTheme` and stateless `WelcomeScreen` as the application, with common string resources and no network or dependency injection.
+
+Both light and dark previews have been visually verified in the IDE. The installed Android CLI exporter currently fails to export these common previews, so use the IDE preview panel; see [validation notes](docs/VALIDATION.md). Generated artifacts and logs under `artifacts/` are ignored. Android-backed previews do not verify iOS runtime behavior.
+
+## Pinned toolchain
+
+| Component | Version |
+| --- | --- |
+| Android Gradle plugin | 9.1.1 |
+| Gradle wrapper | 9.5.1, with distribution checksum |
+| Kotlin / Compose compiler plugin | 2.4.21 |
+| Compose Multiplatform | 1.12.2 |
+| Material 3 | 1.9.0, stable |
+| Gradle daemon JDK | 21 |
+| Android minimum / compile / target SDK | 24 / 37 / 37 |
+
+AGP is deliberately kept at the working template version. The installed Quail 1 IDE supports AGP through 9.2, while the current KMP compatibility table supports AGP through 9.3.1; upgrading to the latest 9.4.1 is outside that verified combination. An update notification alone does not require a project migration. [Android Studio compatibility](https://developer.android.com/studio/releases), [KMP compatibility](https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html).
+
+Material 3 versions are independent of CMP versions. Its stable line replaces the generated template's alpha dependency.
+
+## Git and AI workflow
+
+The repository keeps source, Gradle wrapper, Xcode project files, and shared project guidance under version control. Local SDK paths, IDE state, build/cache output, signing keys, and generated verification artifacts are excluded.
+
+[AGENTS.md](AGENTS.md) contains concise project-specific guidance. Use [validation notes](docs/VALIDATION.md) for checks actually completed and remaining limits.
+
+AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, and foundation setup/verification. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.

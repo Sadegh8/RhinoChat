@@ -1,6 +1,6 @@
 # Rhino chat challenge: review and implementation roadmap
 
-Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. Architecture remains proposed; application implementation has not started.
+Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. CMP foundation implementation has started; chat architecture remains proposed.
 
 The workspace was empty at review time. This document separates the employer's brief, current documentation, and our engineering decisions. Documentation findings and official source links are in [RESEARCH.md](docs/RESEARCH.md).
 
@@ -176,6 +176,8 @@ Preview the stateless screen and substantial components with the shared theme. P
 Use the supported `androidx.compose.ui.tooling.preview.Preview` setup for the selected CMP toolchain. Compilation, preview rendering, and device verification are distinct evidence; record only checks actually performed. An Android-backed common preview does not establish iOS keyboard, accessibility, or safe-area behavior.
 
 ## Implementation sequence and time budget
+
+Foundation progress on 24 October: the Android build, shared host test runner, lint, common light/dark IDE previews, and shared iOS simulator Kotlin compilation are verified. Local Git and ignore rules are initialized. See [validation evidence and limits](docs/VALIDATION.md). The supplied API/adapter will be introduced with the data implementation; this milestone does not claim working chat behavior.
 
 Tests are added alongside each behavior; the verification allocation completes the integration checks. These estimates assume a functioning local Android toolchain and cached dependencies.
 
