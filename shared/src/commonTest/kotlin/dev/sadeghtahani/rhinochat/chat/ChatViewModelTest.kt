@@ -13,6 +13,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -29,6 +31,37 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
+    @Test fun activeLoadAndSendSurviveUiRecollectionWithoutRepeatingCommands() {
+        val historyResponse = CompletableDeferred<Unit>()
+        val sendResponse = CompletableDeferred<Unit>()
+        withViewModel(collect = false, prepare = { repository ->
+            repository.beforeInitial = { historyResponse.await() }
+            repository.beforeSend = { sendResponse.await() }
+        }) { vm, repository ->
+            val firstCollector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+            vm.onDraftChanged("Send while history waits")
+            vm.sendMessage()
+            runCurrent()
+            vm.onDraftChanged("Keep the next draft")
+            firstCollector.cancel()
+            advanceTimeBy(5_001)
+            runCurrent()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+            runCurrent()
+            assertEquals(1, repository.initialCalls)
+            assertEquals(1, repository.sendCalls)
+            assertEquals(HistoryLoadState.Loading, vm.uiState.value.initialLoad)
+            assertEquals(DeliveryStatus.SENDING, vm.uiState.value.messages.single().deliveryStatus)
+            assertEquals("Keep the next draft", vm.uiState.value.draft)
+            historyResponse.complete(Unit)
+            sendResponse.complete(Unit)
+            runCurrent()
+            assertEquals(HistoryLoadState.Idle, vm.uiState.value.initialLoad)
+            assertEquals(DeliveryStatus.SENT, vm.uiState.value.messages.single().deliveryStatus)
+            assertEquals("Keep the next draft", vm.uiState.value.draft)
+        }
+    }
+
     @Test fun initialLoadStartsOnceAndDraftSurvivesStateRecollection() = withViewModel(collect = false) { vm, repository ->
         val firstCollector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.uiState.collect {}
@@ -144,14 +177,108 @@ class ChatViewModelTest {
         assertEquals(null, vm.uiState.value.actionError)
     }
 
+    @Test fun observationFailureRetainsCacheAndKeepsDraftAndActionErrorsLiveUntilExplicitRetry() = withViewModel { vm, repository ->
+        val cached = message()
+        repository.messages.value = listOf(cached)
+        repository.pagination.value = PaginationState(true, "20")
+        vm.onDraftChanged("Before failure")
+        runCurrent()
+        repository.messageObservationError.value = ChatError.STORAGE
+        runCurrent()
+        assertEquals(listOf(cached), vm.uiState.value.messages)
+        assertEquals(HistoryLoadState.Failed(ChatError.STORAGE), vm.uiState.value.initialLoad)
+        assertFalse(vm.uiState.value.hasMoreHistory)
+
+        vm.onDraftChanged("Still editable")
+        repository.beforeEnqueue = { throw ChatDataException(ChatError.STORAGE) }
+        vm.sendMessage()
+        runCurrent()
+        assertEquals("Still editable", vm.uiState.value.draft)
+        assertEquals(ChatError.STORAGE, vm.uiState.value.actionError)
+        assertFalse(vm.uiState.value.isEnqueueing)
+        vm.dismissActionError()
+        runCurrent()
+        assertEquals(null, vm.uiState.value.actionError)
+
+        repository.messageObservationError.value = null
+        val updated = cached.copy(text = "Cache is readable again")
+        repository.messages.value = listOf(updated)
+        runCurrent()
+        assertEquals(listOf(cached), vm.uiState.value.messages)
+        assertEquals(1, repository.messageSubscriptions)
+        vm.loadInitialMessages()
+        runCurrent()
+        assertEquals(2, repository.messageSubscriptions)
+        assertEquals(listOf(updated), vm.uiState.value.messages)
+        assertEquals("Still editable", vm.uiState.value.draft)
+        assertEquals(HistoryLoadState.Idle, vm.uiState.value.initialLoad)
+        assertTrue(vm.uiState.value.hasMoreHistory)
+        repository.beforeEnqueue = {}
+        vm.sendMessage()
+        runCurrent()
+        assertEquals("", vm.uiState.value.draft)
+        assertEquals("Still editable", vm.uiState.value.messages.last().text)
+        assertEquals(DeliveryStatus.SENT, vm.uiState.value.messages.last().deliveryStatus)
+    }
+
+    @Test fun firstObservationFailureCanRecoverWithoutRecreatingTheViewModel() = withViewModel(
+        prepare = { it.messageObservationError.value = ChatError.STORAGE },
+    ) { vm, repository ->
+        assertEquals(HistoryLoadState.Failed(ChatError.STORAGE), vm.uiState.value.initialLoad)
+        vm.onDraftChanged("Keep this draft")
+        repository.messageObservationError.value = null
+        repository.messages.value = listOf(message())
+        vm.loadInitialMessages()
+        runCurrent()
+        assertEquals("Keep this draft", vm.uiState.value.draft)
+        assertEquals(listOf(message()), vm.uiState.value.messages)
+        assertEquals(HistoryLoadState.Idle, vm.uiState.value.initialLoad)
+    }
+
+    @Test fun paginationObservationFailureRetainsMessagesAndRestartsBothObservations() = withViewModel { vm, repository ->
+        repository.messages.value = listOf(message())
+        runCurrent()
+        repository.paginationObservationError.value = ChatError.STORAGE
+        runCurrent()
+        assertEquals(listOf(message()), vm.uiState.value.messages)
+        assertEquals(HistoryLoadState.Failed(ChatError.STORAGE), vm.uiState.value.initialLoad)
+        repository.paginationObservationError.value = null
+        repository.pagination.value = PaginationState(true, "40")
+        vm.loadInitialMessages()
+        runCurrent()
+        assertEquals(HistoryLoadState.Idle, vm.uiState.value.initialLoad)
+        assertEquals("40", vm.uiState.value.nextHistoryCursor)
+        assertEquals(2, repository.messageSubscriptions)
+        assertEquals(2, repository.paginationSubscriptions)
+    }
+
+    @Test fun observationRetryDuringAnActiveHistoryRequestDoesNotRepeatTheRequest() = withViewModel { vm, repository ->
+        val response = CompletableDeferred<Unit>()
+        repository.beforeInitial = { response.await() }
+        vm.loadInitialMessages()
+        runCurrent()
+        repository.messageObservationError.value = ChatError.STORAGE
+        runCurrent()
+        repository.messageObservationError.value = null
+        vm.loadInitialMessages()
+        runCurrent()
+        assertEquals(2, repository.initialCalls) // Startup plus the one active request.
+        assertEquals(2, repository.messageSubscriptions)
+        assertEquals(HistoryLoadState.Loading, vm.uiState.value.initialLoad)
+        response.complete(Unit)
+        runCurrent()
+        assertEquals(HistoryLoadState.Idle, vm.uiState.value.initialLoad)
+    }
+
     private fun withViewModel(
         collect: Boolean = true,
+        prepare: (FakeRepository) -> Unit = {},
         block: suspend TestScope.(ChatViewModel, FakeRepository) -> Unit,
     ) = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = ViewModelStore()
         try {
-            val repository = FakeRepository()
+            val repository = FakeRepository().also(prepare)
             val vm = ChatViewModel(repository, "chat")
             owner.put("chat", vm)
             if (collect) {
@@ -170,6 +297,10 @@ class ChatViewModelTest {
     private class FakeRepository : ChatRepository {
         val messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val pagination = MutableStateFlow(PaginationState())
+        val messageObservationError = MutableStateFlow<ChatError?>(null)
+        val paginationObservationError = MutableStateFlow<ChatError?>(null)
+        var messageSubscriptions = 0
+        var paginationSubscriptions = 0
         var initialCalls = 0
         var olderCalls = 0
         var enqueueCalls = 0
@@ -180,9 +311,17 @@ class ChatViewModelTest {
         var sendResult: ChatOperationResult = ChatOperationResult.Completed
         var beforeEnqueue: suspend () -> Unit = {}
         var beforeSend: suspend () -> Unit = {}
+        var beforeInitial: suspend () -> Unit = {}
 
-        override fun observeMessages(conversationId: String) = messages
-        override fun observePagination(conversationId: String) = pagination
+        override fun observeMessages(conversationId: String) = combine(messages, messageObservationError) { value, error ->
+            error?.let { throw ChatDataException(it) }
+            value
+        }.onStart { messageSubscriptions++ }
+
+        override fun observePagination(conversationId: String) = combine(pagination, paginationObservationError) { value, error ->
+            error?.let { throw ChatDataException(it) }
+            value
+        }.onStart { paginationSubscriptions++ }
 
         override suspend fun enqueueMessage(conversationId: String, text: String): ChatMessage {
             enqueueCalls++
@@ -205,6 +344,7 @@ class ChatViewModelTest {
 
         override suspend fun loadInitialMessages(conversationId: String): ChatOperationResult {
             initialCalls++
+            beforeInitial()
             return initialResult
         }
 

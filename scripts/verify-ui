@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: ./scripts/verify-ui <device-serial> [Gradle options]" >&2
+    exit 2
+fi
+device_serial=$1
+shift
+project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$project_root"
+
+# Select one transport explicitly when the same phone is connected by USB and Wi-Fi.
+export ANDROID_SERIAL="$device_serial"
+exec ./gradlew :androidApp:connectedDebugAndroidTest \
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --console=plain "$@"

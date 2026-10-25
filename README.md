@@ -2,7 +2,7 @@
 
 An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-Current milestone: restart-safe demo sends, reliable history triggering, and a small Koin composition root. Android opens a conversation backed by Room and the supplied fake API, with optimistic sends, retry, older history, adaptive layouts, and shared previews. The reported restart collisions and stationary history trigger are addressed; focused build/runtime evidence and remaining limits are recorded in [validation](docs/VALIDATION.md). The optional iOS host still displays the foundation screen pending its own remote integration.
+Android implements the challenge's single conversation screen with Room-backed cached messages, optimistic sends, retry, paginated history, rotation-retained drafts, and independent loading errors. Database observation failures preserve the last readable cache and leave input controls live; Try again reconnects observation. The supplied fake remains unchanged with its default 20% failure rate. Current automated/device evidence and limits are recorded in [validation](docs/VALIDATION.md). The optional iOS host still displays the foundation screen pending its own remote integration.
 
 ## Project layout
 
@@ -23,7 +23,7 @@ Use the checked-in Gradle wrapper:
 ./scripts/verify
 ```
 
-This builds the debug APK, compiles common metadata, runs shared/adapter tests on the Android host, runs file-backed database/repository tests on the JVM, and runs Android lint. For a focused check:
+This builds the debug APK and instrumented test APK, compiles common metadata, runs shared/adapter tests on the Android host, runs file-backed database/repository tests on the JVM, and runs Android lint. Building the UI-test APK compiles the tests; running them requires a device. For a focused check:
 
 ```sh
 ./gradlew :androidApp:assembleDebug
@@ -34,6 +34,18 @@ This builds the debug APK, compiles common metadata, runs shared/adapter tests o
 
 `ChatLocalStoreTest` checks real Room/SQLite persistence and transactions. `OfflineFirstChatRepositoryTest` adds delayed sends, failure/retry, lost acknowledgements, cancellation, restart, and overlapping history. Common `ChatViewModelTest` checks draft ownership and independent loading/delivery state on both runners. `AndroidChatRemoteDataSourceTest` exercises the actual supplied fake with deterministic failures and virtual time. `PlatformSmokeTest` checks platform wiring. See [actual results](docs/VALIDATION.md).
 
+`ChatViewModelTest` also covers cache observation failures and explicit recovery without freezing drafts or operation state. `ChatHistoryLoadingTest` exercises the actual Compose snapshot observer while stationary, including duplicate-only cursor progress and error/retry gating. `RestartSafeFakeChatRemoteDataSourceTest` combines the actual Android transport/fake sources with file-backed Room on the host JVM to check legacy ID conversion, reset-safe sends, lost responses, rollback, and cached reopen with forced failures. Only test builds share those JVM-compatible transport sources; Android production wiring is unchanged.
+
+Run the automated Compose UI suite on a connected, unlocked device:
+
+```sh
+./scripts/verify-ui <device-serial>
+```
+
+This selects one transport explicitly, useful when the same phone is connected over both USB and Wi-Fi, and retains the installed app after testing. The project also enables APK retention for direct device-test runs; Gradle's default uninstall cleanup can remove the normal demo cache. Gradle writes HTML results to `androidApp/build/reports/androidTests/connected/debug/` and XML results under `androidApp/build/outputs/androidTest-results/connected/debug/`.
+
+`ChatSendFlowTest` launches the actual `MainActivity` and uses the real ViewModel, repository, file-backed Room, and supplied fake's idempotency. A test-only transport gates replies and can lose an acknowledgement after a real server commit. UI assertions check Sending/Failed/Retry/Sent, blank input, draft clearing/retention, same-text intentional sends, out-of-order replies, Activity recreation with requests held open, and history failure/recovery. Database keys/client identities, remote attempt counts, and server copies are checked alongside visible bubbles. A custom runner starts a clean Koin graph before the Activity; every test gets a uniquely named database and deletes only that database afterward. Production uses the unchanged default fake and normal cache.
+
 ## Send, retry, and history
 
 Room is the source of messages. Sending first commits a row with a new UUID and `SENDING`; the ViewModel then clears only the submitted draft and calls the remote API. Acknowledgement merges into the same local key and sets `SENT`. Expected failure leaves `FAILED`; retry claims that row and reuses its persisted UUID/text. Repeated retry taps share one in-flight attempt.
@@ -43,6 +55,8 @@ History requests fetch 20 at a time, with one request per conversation. Each pag
 Koin 4.2.2 starts once in `RhinoChatApplication`, with one process-owned store, supplied fake, restart adapter, and repository. `MainActivity` obtains an Activity-owned `ChatViewModel` through `koinViewModel()` and passes it into shared `App`; the ViewModel and repository keep constructor injection. Screens, components, and previews have no Koin lookups. One small graph demonstrates lifetime ownership; manual wiring was also sufficient for this app, and Koin adds a dependency and runtime graph resolution. No compiler plugin or extra module hierarchy is needed.
 
 The ViewModel owns request lifetimes. Cancellation propagates and interrupted sending rows become retryable once before new commands. There is no background sender or process-death draft restoration. The supplied fake remains unchanged at its default 20% failure rate; it simulates delay/failure rather than actual networking. Its in-memory server resets and reuses `srv-N` after process restart. The Android demo adapter gives outgoing acknowledgements and history a canonical `fake-client:<persisted clientId>` identity; seed messages keep their original IDs. Before the first remote request, it atomically converts earlier acknowledged cache IDs, preserving local/client keys, text, timestamps, and delivery status. Pending rows remain available for explicit retry. Conflicting client/content/sender identities still fail atomically. Cached sent messages are retained locally, not uploaded again. Exactly-once delivery across a fake-server reset remains outside the server's guarantees.
+
+Cache observation is isolated from draft/operation state. A failed read retains the previous messages and cursor, exposes a storage load error, and pauses automatic older loading. Try again reconnects both database observations without duplicating an already active initial request. Persistent storage errors do not cause an automatic retry loop.
 
 The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Select the `androidApp` run configuration in Android Studio to launch it on an emulator or device.
 
@@ -85,4 +99,14 @@ The repository keeps source, Gradle wrapper, Xcode project files, and shared pro
 
 [AGENTS.md](AGENTS.md) contains concise project-specific guidance. Use [validation notes](docs/VALIDATION.md) for checks actually completed and remaining limits.
 
-AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, Compose integration, previews, restart/history bug investigation and fixes, official Koin research and integration, device interaction checks, IDE diagnostics, and automated verification. No additional test suites were added or run during the restart/history/Koin follow-up at the user's request. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
+AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, Compose integration, previews, restart/history bug investigation and fixes, official Koin research and integration, device interaction checks, IDE diagnostics, code/challenge review, database-observation recovery, regression tests, instrumented send-flow UI tests, and automated verification. Earlier validation constraints and the later authorized regression/device passes are recorded in [validation](docs/VALIDATION.md). The author remains responsible for reviewing and explaining every change.
+
+## Delivery and deferred work
+
+The author reported approximately one hour spent so far on 25 October 2026, during the corrective follow-up. This is self-reported effort, without a phase breakdown or independently measured final total; include subsequent fixes/validation in the final disclosure. No separate optional iOS showcase effort was reported. The brief allows five days from receipt; the receipt date has not been recorded, so no delivery deadline is inferred from the PDF date. The author will create the private GitHub repository and grant reviewer access later; no remote is configured yet.
+
+- Process-death draft restoration: add `SavedStateHandle` (or persisted draft storage); the existing Activity-owned ViewModel already handles ordinary rotation.
+- Background retry while closed: add durable scheduled work with backoff and the same persisted client ID; a connectivity callback alone is insufficient, and the supplied fake still resets its server memory.
+- Automated send UI coverage is implemented in `ChatSendFlowTest`; use the separate device command above. Process-death recovery and OS-level rotation/keyboard matrices remain broader checks than `ActivityScenario.recreate()`.
+- iOS showcase: provide a platform remote adapter, wire the existing shared chat, then build and test the SwiftUI host with keyboard/safe-area/lifecycle checks. It remains outside the required Android submission.
+- Additional validation: API 24 runtime, TalkBack, and the complete final tablet/foldable/preview matrix remain to be checked. These are not represented as verified by a successful build.

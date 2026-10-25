@@ -19,6 +19,13 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+
+    androidTestImplementation(libs.androidx.testExt.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    // Compose UI tests otherwise bring Espresso 3.5, whose input reflection fails on API 37.
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.compose.uiTestJunit4)
+    androidTestImplementation(libs.coroutines.core)
 }
 
 android {
@@ -31,6 +38,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "dev.sadeghtahani.rhinochat.testing.ChatUiTestRunner"
     }
     packaging {
         resources {

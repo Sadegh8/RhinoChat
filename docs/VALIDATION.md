@@ -164,5 +164,124 @@ With JDK 21, `:androidApp:assembleDebug :shared:compileCommonMainKotlinMetadata 
 
 - The SwiftUI iOS host was not built, linked, launched, or tested in a simulator. Shared Kotlin/Native compilation is a narrower result.
 - Android's chat UI is wired; the optional iOS host deliberately remains on the welcome starter until it has a platform remote adapter and host integration.
-- Remaining Android acceptance/handoff work includes broader deterministic regression coverage when authorized, accessibility checks, and final walkthrough/time disclosure. Process-death draft restoration and background retry remain optional.
+- The corrective pass below adds deterministic regression coverage and a further device walkthrough. Accessibility, API 24 runtime, remaining adaptive runtime checks, and final delivery/effort disclosure remain separate. Process-death draft restoration and background retry remain optional.
 - The repository is local; no remote repository has been created or pushed.
+
+## Challenge and code review: 25 October 2026
+
+Reviewed commit `1017906` against all six pages of the supplied challenge PDF. This was a review, not implementation of the remaining features. No production source or checked-in test was changed. The brief's five required features are present in Android: distinct timestamped messages, newest-first remote pages of 20 rendered newest at the bottom, optimistic delivery states, retry with persisted client identity, and cached history/unsent messages. Initial and older-load errors are separate from delivery failures. The supplied fake remains unchanged at its default failure rate. API 24, Compose/Kotlin, Coroutines/Flow, MVVM, Room, Koin, meaningful unit tests, and incremental Git history are present.
+
+Current verification with JDK 21:
+
+| Check | Result |
+| --- | --- |
+| `./scripts/verify` | Passed: debug APK, common metadata, Android host tests, JVM tests, Android lint |
+| Existing Android host tests | 25 executions; zero failures/errors/skips |
+| Existing JVM tests | 48 executions; zero failures/errors/skips |
+| Distinct existing cases | 51; 22 common cases execute on both runners, giving 73 executions |
+| Lint | Zero errors; six warnings: three version advisories, redundant drawable qualifier, two missing monochrome icon layers |
+| Git remote | None configured; private repository delivery and reviewer access remain outstanding |
+
+The verification log is local at `artifacts/verification/review/verify.log`. The earlier no-test constraint recorded above describes the preceding follow-up; the current user requested a fresh completeness/code review, and the existing suite was run for this review.
+
+Confirmed code finding: `ChatViewModel.uiState` catches an observation error after combining the database, draft, and operation flows, emits one error state, then completes. While the screen stays subscribed, subsequent draft edits, error dismissal, and load results cannot update that state. An isolated JVM diagnostic injected a `ChatDataException(STORAGE)` from message observation after an initial successful emission; the displayed draft remained at its previous value and the storage banner remained after editing, dismissal, and another initial-load command. Recovery should keep draft/operation state live and provide a way to restart failed database observation. This finding remains unfixed.
+
+The diagnostic was outside the repository source sets and supplied only through a temporary Gradle init script. It passed by asserting the observed frozen-state defect; it is evidence of the issue, not a passing acceptance test. Its source, init script, and log are retained locally under `artifacts/verification/review/`. No regression test for this behavior is checked in.
+
+Remaining review/handoff gaps:
+
+- The restart adapter's successful ID normalization and atomic legacy-cache conversion have device evidence but no checked-in regression test. The existing generic repository reset test deliberately expects an identity conflict without that adapter. The stationary/cursor-driven Compose history trigger also lacks an automated regression test.
+- Final-revision rotation with a request in flight, a complete walk through all 120 seed messages, and an end-to-end cached reopen with a forced history failure were not exercised in this review. Earlier manual draft rotation/restart evidence and file-backed persistence tests remain narrower evidence. The fake does not use device connectivity, so airplane mode alone cannot establish its failure behavior.
+- No API 24 runtime, new accessibility session, complete final adaptive preview rendering, tablet/foldable runtime, or iOS host integration was performed. Shared compilation and layout tests do not establish those runtime results.
+- The actual effort ledger remains missing. Record baseline, research, corrective work, and optional showcase time honestly; confirm the receipt date for the five-day deadline and disclose an overrun if applicable. No deadline or actual hours are inferred from the PDF date or Git timestamps.
+- README explains run/test, identity/delivery, architecture, AI use, and current limitations. Before delivery, add concise deferred-work implementation notes (for example saved-state draft recovery and durable scheduled background retry), actual effort, and a final scope statement. The roadmap has the longer extension discussion.
+
+Background retry, process-death draft restoration, an automated send-flow UI test, and functional iOS are not required Android challenge features. Jump to latest, date separators, dark appearance, and RTL-aware layout are implemented; their remaining runtime/accessibility checks should not be represented as completed.
+
+## Observation recovery and regression fixes: 25 October 2026
+
+The user authorized fixing the review findings and testing on the connected Pixel 7 Pro. The database-observation freeze identified above is now fixed. Local cache observation is retained separately from draft/operation state; a read failure keeps the last readable messages/cursor, exposes a storage history error, and pauses automatic older loading. Typing, enqueue/error state, and dismissal remain live. Try again explicitly reconnects both observations, including during an already active initial load, without issuing a duplicate remote request. Cancellation and unexpected failures still propagate. The history storage message now describes access to saved messages rather than only saving changes.
+
+The existing viewport/cursor `snapshotFlow` was extracted into `historyLoadRequests`, which the screen and behavioral tests both use. Its eligibility and distinctness are unchanged. No new UI framework, scheduler, module, dependency upgrade, database schema, or fake API modification was introduced.
+
+New checked-in regression coverage:
+
+- Five ViewModel cases: first-read failure, later message/pagination observation failure, live cached/draft/action state and successful send after recovery, explicit retry during an active history request, and a pending history load/send surviving UI collector removal and restoration without repeated commands. Some cases combine related assertions.
+- Five history observer cases: stationary cursor progress with an unchanged list, error/retry gating, leaving/returning to the boundary, unrelated UI updates, and empty/uninitialized/exhausted history.
+- Four file-backed restart-adapter integration cases: legacy ID conversion across reopen plus new sends after fake resets; lost acknowledgement/retry with all history pages and one canonical row; atomic rollback before transport on conflicting conversion; and cached history/unsent identity surviving reopen when the supplied fake is configured to fail every request in the test.
+
+The JVM test target compiles the actual Android transport directory alongside the tests. Those sources use JVM APIs only; no production source was copied, and Android production wiring remains unchanged. Production still constructs `FakeChatApi()` with its default failure rate. Only tests select deterministic 0%/100% rates.
+
+| Final check | Actual result |
+| --- | --- |
+| Focused ViewModel/history JVM tests | Passed before the full run |
+| `./scripts/verify :shared:compileKotlinIosSimulatorArm64`, JDK 21 | Passed: debug APK, common metadata, Android host/JVM suites, lint, shared iOS simulator compilation |
+| Android host suite | 35 executions; zero failures/errors/skips |
+| JVM suite | 62 executions; zero failures/errors/skips |
+| Distinct cases | 65; 32 common cases run on both targets, giving 97 executions |
+| Lint | Zero errors; the same six existing warnings |
+| Compiler | Existing Room generated expect/actual beta warnings remain |
+| Source hygiene | `git diff --check` passed; supplied fake, pinned versions, and schema snapshots unchanged |
+
+Logs are local and ignored under `artifacts/verification/recovery-fixes/`. Shared iOS compilation remains narrower than an iOS host build/link/runtime result.
+
+Device checks used the USB-connected Pixel 7 Pro, serial `2B041FDH30092R`, API 37, with app data retained:
+
+| Interaction | Observed result and limit |
+| --- | --- |
+| Install and launch | Koin graph resolved and cached chat opened |
+| Draft rotation | Entered `Pixel regression draft`; portrait → landscape retained the draft |
+| Send and immediate rotation back | The draft cleared and one visible row became Sent. After rotation the saved viewport stayed above that row; Latest messages revealed it. This UI check does not independently count server requests or measure whether the network response was still pending at Activity recreation; the controlled ViewModel case holds both requests open across collector recreation. |
+| Process restart | Force-stopped/reopened without clearing data; the sent test row remained |
+| New send after fake reset | `Pixel restart check` became Sent; the earlier row remained, with no identity error |
+| Older-page error/retry | Two default simulated failures were observed at older boundaries. Both stayed awaiting explicit Try again; retry recovered. At the first retry, message 100 kept its vertical position as 99/98 appeared above it. |
+| Complete history traversal | Scrolled through the supplied history to message 0 and the You’re at the beginning status. The integration test independently asserts all 120 seed identities plus one outgoing row, without duplicates. |
+| Final build install | Installed the final verified APK in place; both sent test rows and cached history remained available |
+| Device restoration | Original `wm user-rotation` state was `lock 0`; restored and confirmed `lock 0`. No app data or system image was cleared. |
+
+Both device sends succeeded with the default random failure rate. Lost acknowledgement, failed-send retry, and forced history failure after file-backed reopen are established by controlled tests, not by a deterministic physical-device failure schedule. No screenshot or conversation database was exported during this pass. No API 24 runtime, TalkBack session, complete adaptive preview matrix, tablet/foldable runtime, or iOS host integration is claimed.
+
+README now includes deferred-work approaches and the author's reported effort: approximately one hour so far, supplied during this follow-up, with no phase breakdown or independently timed final total. Subsequent corrective/validation effort should be included in the final disclosure. No separate optional iOS showcase effort was supplied, and no iOS showcase integration was performed here. Receipt date remains unrecorded; no deadline was invented.
+
+The author explicitly chose to create GitHub later. No remote was configured, repository created, push performed, or reviewer invitation sent. All source, tests, and documentation changes remain unstaged and uncommitted for review.
+
+## Automated send-flow UI suite: 25 October 2026
+
+The user explicitly requested a meaningful automated UI test for the send flow and its edge cases. `androidApp/src/androidTest/.../ChatSendFlowTest.kt` now contains four Compose instrumentation cases. They launch the actual MainActivity, enter text and activate the real send/retry controls, then assert visible editable text and message delivery state. They do not feed fabricated ChatUiState snapshots into the screen or substitute a fake ViewModel/repository.
+
+The fixture uses the production ChatViewModel, OfflineFirstChatRepository, restart adapter, and file-backed Room factory on the device. Its only controlled boundary is transport: the unchanged supplied FakeChatApi runs at a test-only 0% random failure rate, with deferred reply gates and an option to lose a response after the real fake commits. Tests check actual fake-server client-ID copies, persisted local/client identities, and transport attempts alongside UI assertions. Production still calls FakeChatApi() with its default 20% failure rate.
+
+| UI case | Assertions |
+| --- | --- |
+| Lost acknowledgement, then rapid retry | Persisted Sending bubble appears before response; submitted draft clears; a committed-but-lost response shows Failed/Retry; double-tapping retry starts only one additional attempt with the original client ID/text; the same bubble/key becomes Sent; one local row and one actual fake-server message remain |
+| Blank input and two intentional identical sends | Empty/whitespace input disables Send and produces no outgoing row/request; a second intentional same-text send is permitted while the first waits; identities differ; replies can complete out of order; both bubbles/rows reach Sent exactly once |
+| Activity recreation during pending work | Typed draft survives recreation; both history and a send are deliberately held open across another recreation; a newer draft is retained; initial history and send are each called once; the original bubble reaches Sent when replies are released |
+| History failure while sending | An initial load failure does not block optimistic sending/acknowledgement; explicit history retry fetches a page containing the acknowledged message and merges into the existing bubble; the next draft, local identity, and single server copy are retained |
+
+Synchronization uses condition waits for UI/Room/transport observations and Compose idle handling for transitions; there are no fixed sleeps. EditableText semantics are checked separately from placeholder text. Stable local-ID tags scope delivery assertions to their specific bubble. The send button's accessible name now stays present while its enqueue spinner is shown. The Android store factory accepts an optional database name so each fixture can create and remove only its own UUID-named database and Room lock sidecar.
+
+The custom test Application starts an isolated bootstrap graph before a previously open Activity can restore. The first fixture finishes only this app's old task and closes the bootstrap graph/database, then starts a fresh graph for the real Activity under test. Each subsequent case also gets a fresh graph; teardown closes the Activity before the store. An initial plain-Application approach could crash before JUnit when an old task restored without Koin, so it was replaced. Production Application graph startup remains outside this controlled UI suite. These tests exercise ActivityScenario recreation, not process death or a full physical-rotation/keyboard matrix.
+
+Test setup findings and corrections:
+
+- The first device run failed before app actions because Compose UI testing transitively resolved Espresso 3.5.0, whose reflective InputManager initialization fails on API 37. Explicitly including the catalog's existing stable Espresso 3.7.0 fixed it; no hidden-API bypass, alpha release, SDK downgrade, or production toolchain upgrade was used. The Compose UI test artifact 1.12.1 matches the Android UI version delegated by CMP 1.12.2. v2 test rules avoid the deprecated v1 environment.
+- Initial field assertions mixed placeholder and editable semantics, and immediate assertions after recreation preceded lifecycle recollection. The helper now waits for the exact editable value; bubble, identity, attempt-count, and server-copy assertions remain intact.
+- A negative control temporarily changed submitted-draft clearing to retain the submitted text. The lost-reply UI case failed at its empty-draft condition, as expected. The source was automatically restored and the complete suite passed afterward. The failure is test-quality evidence, not an unresolved application failure.
+- Initial setup left Gradle's default APK-uninstall cleanup enabled. This was a setup mistake: after those runs the target package was no longer installed; reinstall showed five earlier cached sent messages, while the two recent Pixel test messages from the preceding manual pass were absent. Their recovery is not claimed. Database isolation inside the fixture did not prevent this runner-level cleanup.
+- APK retention is now enabled in both gradle.properties and verify-ui. A subsequent complete device run passed, the package remained installed, and reopening normally retained the same current saved conversation. The fixture also removes Room's test-only .lck sidecars, which Context.deleteDatabase alone leaves behind. A filename-only check found only the normal rhino-chat database and its sidecars after the corrected cleanup; no conversation database was exported.
+
+Commands and evidence:
+
+- `./scripts/verify-ui 2B041FDH30092R`, JDK 21, USB Pixel 7 Pro API 37: all four cases passed, zero failures/errors/skips. The complete suite also passed after restoring the negative-control mutation, after enabling installation retention, and with the final test Application handling a previously open normal app. The last already-open-app run completed successfully in 36 seconds (about 30 seconds in the tests), with the normal app explicitly confirmed open before test startup.
+- `./scripts/verify :shared:compileKotlinIosSimulatorArm64`: debug APK, UI-test APK compilation, common metadata, 35 Android-host and 62 JVM executions passed; lint retained zero errors and six existing warnings. Shared iOS compilation passed with the existing Room expect/actual warnings; no iOS host runtime is claimed.
+- `scripts/verify` now compiles the device-test APK as part of regular checks. That compilation alone does not execute UI tests; `scripts/verify-ui <device-serial>` selects one transport explicitly and executes them. AGENTS and README document the distinction and the retention setting.
+- Gradle's current UI HTML report is at `androidApp/build/reports/androidTests/connected/debug/index.html`, with XML under `androidApp/build/outputs/androidTest-results/connected/debug/`. Local logs, the negative-control failure, and a copied passing XML report are retained under ignored `artifacts/verification/ui-send-flow/`.
+
+No commit or push was performed. API 24 runtime, accessibility tooling, background retry, process-death draft recovery, and iOS host integration remain outside this UI-test result.
+
+
+### Commit handoff — 25 October 2026
+
+The user authorized committing the reviewed changes. The final required verification plus shared iOS simulator compilation passed again. There were no unmerged files or conflict markers; source changes include all four executed Pixel send-flow tests. Earlier statements that work was uncommitted describe the review stage. Repository creation and pushing remain with the author.
+
+Android Studio still reports six unresolved-reference diagnostics for Android platform declarations in ChatUiFixture after Gradle sync. The real Kotlin compiler resolves them, the test APK compiles, and all four device tests previously executed successfully. These IDE diagnostics remain a tooling limitation; no suppression or copied production code was added to hide them.

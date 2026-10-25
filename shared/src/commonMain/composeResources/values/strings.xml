@@ -20,6 +20,7 @@
     <string name="older_failed">Couldn’t load earlier messages.</string>
     <string name="network_error">Couldn’t connect. Please try again.</string>
     <string name="storage_error">Couldn’t save your changes. Please try again.</string>
+    <string name="history_storage_error">Couldn’t access saved messages. Please try again.</string>
     <string name="identity_error">Couldn’t confirm the messages. Your saved conversation is safe.</string>
     <string name="try_again">Try again</string>
     <string name="dismiss_error">Dismiss error</string>

@@ -21,7 +21,8 @@
 
 ## Checks
 
-- `./scripts/verify`: debug APK, common metadata, Android host shared/adapter tests, real Room/repository and shared ViewModel tests through `:shared:jvmTest`, and Android lint. The JVM target exists for host testing, not a desktop app.
+- `./scripts/verify`: debug APK, UI-test APK compilation, common metadata, Android host shared/adapter tests, real Room/repository and shared ViewModel tests through `:shared:jvmTest`, and Android lint. The JVM target exists for host testing, not a desktop app.
+- `./scripts/verify-ui <device-serial>`: real Compose instrumentation tests on one selected device. The suite drives MainActivity with the real ViewModel/repository/Room and a controlled transport, uses isolated named databases, and must never clear the normal demo cache. A successful test-APK build is not an executed UI test.
 - Room entities and DAOs are internal; expose plain models through the local store/repository. Use the Room 3 artifact/import family and retain exported schema snapshots. Do not enable destructive migration fallback.
 - Run a focused Gradle task during a change; run the affected required checks at handoff. Use the wrapper, JDK 21, and the pinned version catalog.
 - Chat screen previews live at the bottom of `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/ChatScreen.kt`, component previews beside their functions. The welcome screen remains the optional iOS starter. Rendering instructions are in README.

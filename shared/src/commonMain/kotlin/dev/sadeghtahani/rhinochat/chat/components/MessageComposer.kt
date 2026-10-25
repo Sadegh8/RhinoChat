@@ -52,6 +52,7 @@ internal fun MessageComposer(
     val scale by animateFloatAsState(if (pressed) 0.94f else 1f, RhinoMotion.fastSpatial(), label = "Send press")
     val corner by animateDpAsState(if (pressed) 18.dp else 28.dp, RhinoMotion.fastSpatial(), label = "Send shape")
     val fieldLabel = stringResource(Res.string.message_hint)
+    val sendLabel = stringResource(Res.string.send_message)
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -75,14 +76,15 @@ internal fun MessageComposer(
         FilledIconButton(
             onClick = onSend,
             enabled = text.isNotBlank() && !isEnqueueing,
-            modifier = Modifier.size(56.dp).graphicsLayer { scaleX = scale; scaleY = scale },
+            modifier = Modifier.size(56.dp).semantics { contentDescription = sendLabel }
+                .graphicsLayer { scaleX = scale; scaleY = scale },
             shape = RoundedCornerShape(corner),
             interactionSource = interaction,
         ) {
             if (isEnqueueing) {
                 CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
             } else {
-                Icon(painterResource(Res.drawable.arrow_upward), stringResource(Res.string.send_message))
+                Icon(painterResource(Res.drawable.arrow_upward), null)
             }
         }
     }

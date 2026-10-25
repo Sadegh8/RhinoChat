@@ -2,6 +2,14 @@
 
 Checked on 24 October 2026. Primary sources only. This is a dated research snapshot, not a claim that the proposed application has been built or validated. Links are evidence; recommendations in the roadmap are our interpretation for a single-screen challenge.
 
+## Instrumented send-flow tests: 25 October follow-up
+
+[Compose test setup](https://developer.android.com/develop/ui/compose/testing), [synchronization](https://developer.android.com/develop/ui/compose/testing/synchronization), and [v2 migration](https://developer.android.com/develop/ui/compose/testing/migrate-v2) were checked for the new device suite. The installed UI test artifact supports v2 `createAndroidComposeRule`; it avoids the deprecated v1 environment. External Room/transport results are awaited through observable conditions rather than fixed sleeps.
+
+[Koin instrumented testing](https://insert-koin.io/docs/reference/koin-android/instrumented-testing/) documents test Applications, fresh test graphs, and rule ordering before Activity launch. The project uses a custom runner plus an outer fixture so production startup cannot open the normal demo cache before test definitions are installed.
+
+The cached CMP 1.12.2 Android artifact metadata delegates to AndroidX Compose UI 1.12.1; the UI test artifact is pinned to that existing Android runtime version. Compose UI testing transitively brought Espresso 3.5.0, whose reflective input initialization failed on the actual API 37 device. [Espresso 3.7.0 release notes](https://developer.android.com/jetpack/androidx/releases/test#espresso-3.7.0) describe replacing reflective InputManager lookup with getSystemService. Adding the already-cataloged stable `espresso-core:3.7.0` explicitly resolved that failure. No alpha dependency, hidden-API bypass, SDK downgrade, or production Compose/toolchain upgrade was used. Actual test outcomes are recorded in [validation](VALIDATION.md).
+
 ## Android architecture
 
 [Google: architecture recommendations](https://developer.android.com/topic/architecture/recommendations)

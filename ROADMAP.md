@@ -1,6 +1,6 @@
 # Rhino chat challenge: review and implementation roadmap
 
-Reviewed on 24 October 2026. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. Foundation, persistence, and reliable behavior are committed. Compose chat integration and previews are implemented for review; final acceptance checks/handoff remain.
+Reviewed on 24 October 2026, with corrective validation on 25 October. Scope confirmed by the user: 3–4 hour submission plus an optional showcase. Foundation, persistence, reliable behavior, adaptive Compose chat, and restart-safe Android wiring are committed. The latest follow-up fixes database-observation recovery and adds regression coverage for cache recovery, restart adaptation, stationary history loading, and four device send-flow scenarios. Private repository delivery remains with the author; final results and runtime limits are in [validation](docs/VALIDATION.md).
 
 The workspace was empty at review time. This document separates the employer's brief, current documentation, and our engineering decisions. Documentation findings and official source links are in [RESEARCH.md](docs/RESEARCH.md).
 
@@ -246,7 +246,7 @@ Token-efficiency practices:
 
 This is the separately tracked showcase selected by the user. Begin it only after recording the verified Android baseline and its commit.
 
-After the required Android checks pass, consider one send-flow UI test, RTL/dark-mode verification, and process-death draft recovery. Native iOS integration can then demonstrate shared behavior if there is separate time and an acceptable remote implementation. Verify it in a simulator with keyboard, safe areas, lifecycle, and accessibility; report native compilation separately from runtime testing.
+Four send-flow UI tests now pass on the Pixel 7 Pro. Further optional checks include RTL/dark-mode verification and process-death draft recovery. Native iOS integration can then demonstrate shared behavior if there is separate time and an acceptable remote implementation. Verify it in a simulator with keyboard, safe areas, lifecycle, and accessibility; report native compilation separately from runtime testing.
 
 Background retry is last: it needs durable queued work, retry/backoff policy, platform scheduling, and an honest account of the fake server's reset behavior. A connectivity callback alone does not meet the closed-app requirement, and a fake network failure is independent of real connectivity.
 

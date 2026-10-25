@@ -61,8 +61,13 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.coroutines.test)
         }
-        jvmTest.dependencies {
-            implementation(libs.kotlin.testJunit)
+        jvmTest {
+            // These Android transport sources use JVM APIs only. Compile the same sources in
+            // host tests to exercise the supplied fake and restart adapter with real Room.
+            kotlin.srcDir("src/androidMain/kotlin/dev/sadeghtahani/rhinochat/chat/data/remote")
+            dependencies {
+                implementation(libs.kotlin.testJunit)
+            }
         }
     }
 }

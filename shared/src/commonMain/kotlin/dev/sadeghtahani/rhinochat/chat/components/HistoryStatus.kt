@@ -65,7 +65,7 @@ internal fun HistoryStatus(
             is HistoryLoadState.Failed -> {
                 val label = when (state.error) {
                     ChatError.IDENTITY_CONFLICT -> Res.string.identity_error
-                    ChatError.STORAGE -> Res.string.storage_error
+                    ChatError.STORAGE -> Res.string.history_storage_error
                     ChatError.NETWORK -> if (isInitial) Res.string.load_failed else Res.string.older_failed
                 }
                 Text(

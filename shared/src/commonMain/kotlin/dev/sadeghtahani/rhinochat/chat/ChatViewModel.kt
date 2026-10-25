@@ -2,6 +2,7 @@ package dev.sadeghtahani.rhinochat.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sadeghtahani.rhinochat.chat.data.ChatCacheState
 import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
 import dev.sadeghtahani.rhinochat.chat.data.ChatError
 import dev.sadeghtahani.rhinochat.chat.data.ChatOperationResult
@@ -9,15 +10,19 @@ import dev.sadeghtahani.rhinochat.chat.data.ChatOperationState
 import dev.sadeghtahani.rhinochat.chat.data.ChatUiState
 import dev.sadeghtahani.rhinochat.chat.data.HistoryLoadState
 import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
     private val repository: ChatRepository,
     private val conversationId: String,
@@ -25,27 +30,37 @@ class ChatViewModel(
     private val draft = MutableStateFlow("")
     private var draftVersion = 0L
     private val operations = MutableStateFlow(ChatOperationState())
+    private val observationAttempt = MutableStateFlow(0L)
+
+    private val cache: StateFlow<ChatCacheState> = observationAttempt.flatMapLatest {
+        combine(
+            repository.observeMessages(conversationId),
+            repository.observePagination(conversationId),
+        ) { messages, pagination -> ChatCacheState(messages, pagination) }
+            .onStart { emit(lastKnownCache().copy(error = null)) }
+            .catch { failure ->
+                if (failure is ChatDataException) emit(lastKnownCache().copy(error = failure.error))
+                else throw failure
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), ChatCacheState())
 
     val uiState: StateFlow<ChatUiState> = combine(
-        repository.observeMessages(conversationId),
-        repository.observePagination(conversationId),
+        cache,
         draft,
         operations,
-    ) { messages, pagination, text, operation ->
+    ) { cached, text, operation ->
+        val initialLoad = cached.error?.let { HistoryLoadState.Failed(it) } ?: operation.initialLoad
         ChatUiState(
-            messages = messages,
+            messages = cached.messages,
             draft = text,
-            initialLoad = operation.initialLoad,
+            initialLoad = initialLoad,
             olderLoad = operation.olderLoad,
-            hasMoreHistory = (operation.initialLoad == HistoryLoadState.Idle) &&
-                pagination.hasLoadedInitialPage && pagination.nextCursor != null,
-            nextHistoryCursor = pagination.nextCursor,
+            hasMoreHistory = (initialLoad == HistoryLoadState.Idle) &&
+                cached.pagination.hasLoadedInitialPage && cached.pagination.nextCursor != null,
+            nextHistoryCursor = cached.pagination.nextCursor,
             isEnqueueing = operation.isEnqueueing,
             actionError = operation.actionError,
         )
-    }.catch { failure ->
-        if (failure is ChatDataException) emit(lastKnownState().copy(actionError = failure.error))
-        else throw failure
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     init {
@@ -85,6 +100,8 @@ class ChatViewModel(
     }
 
     fun loadInitialMessages() {
+        // Reconnect only on a user retry; never loop automatically on a persistent storage error.
+        if (cache.value.error != null) observationAttempt.update { it + 1 }
         if (operations.value.initialLoad == HistoryLoadState.Loading) return
         operations.update { it.copy(initialLoad = HistoryLoadState.Loading) }
         viewModelScope.launch {
@@ -118,5 +135,5 @@ class ChatViewModel(
         ChatOperationResult.Completed, ChatOperationResult.Ignored -> HistoryLoadState.Idle
     }
 
-    private fun lastKnownState() = uiState.value
+    private fun lastKnownCache() = cache.value
 }

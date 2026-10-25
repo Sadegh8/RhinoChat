@@ -47,12 +47,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -74,7 +74,6 @@ import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
 import dev.sadeghtahani.rhinochat.chat.data.HistoryLoadState
 import dev.sadeghtahani.rhinochat.theme.RhinoChatTheme
 import dev.sadeghtahani.rhinochat.theme.RhinoMotion
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -117,19 +116,11 @@ fun ChatScreen(
     }
 
     LaunchedEffect(listState) {
-        snapshotFlow {
-            val layout = listState.layoutInfo
-            val nearHistory = latestState.hasMoreHistory && latestState.olderLoad == HistoryLoadState.Idle &&
-                layout.totalItemsCount > 0 &&
-                (layout.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layout.totalItemsCount - 3
-            // Include cursor progress: duplicate-only cached pages may leave layout unchanged,
-            // and StateFlow may coalesce a very short Loading → Idle transition.
-            latestState.nextHistoryCursor.takeIf { nearHistory }
-        }.distinctUntilChanged().collect { cursor ->
-            if (cursor != null) {
-                loadOlder()
-            }
-        }
+        historyLoadRequests(
+            state = { latestState },
+            totalItemsCount = { listState.layoutInfo.totalItemsCount },
+            lastVisibleItemIndex = { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 },
+        ).collect { loadOlder() }
     }
 
     AdaptiveChatCanvas(posture, modifier) { layout ->
@@ -224,7 +215,7 @@ fun ChatScreen(
                             val olderDate = remember(olderMessage?.createdAtMillis) {
                                 olderMessage?.let { formatMessageTimestamp(it.createdAtMillis).date }
                             }
-                            Column(Modifier.animateItem(
+                            Column(Modifier.testTag("chat-message-${message.localId}").animateItem(
                                 fadeInSpec = RhinoMotion.effects(), placementSpec = RhinoMotion.spatial(), fadeOutSpec = RhinoMotion.effects(),
                             )) {
                                 if (timestamp.date != olderDate) {
