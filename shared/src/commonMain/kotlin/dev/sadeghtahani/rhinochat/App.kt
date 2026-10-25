@@ -6,8 +6,8 @@ import dev.sadeghtahani.rhinochat.chat.ChatViewModel
 import dev.sadeghtahani.rhinochat.theme.RhinoChatTheme
 
 @Composable
-fun App(chatViewModel: ChatViewModel) {
+fun App(chatViewModel: ChatViewModel, isOffline: Boolean = false) {
     RhinoChatTheme {
-        ChatRoute(chatViewModel)
+        ChatRoute(chatViewModel, isOffline)
     }
 }

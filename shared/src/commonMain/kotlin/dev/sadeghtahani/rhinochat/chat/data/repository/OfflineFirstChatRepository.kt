@@ -60,6 +60,23 @@ class OfflineFirstChatRepository(
     override suspend fun loadOlderMessages(conversationId: String) =
         loadPage(conversationId, initial = false)
 
+    override suspend fun resetHistoryCache(conversationId: String): ChatOperationResult = operation {
+        require(conversationId.isNotBlank())
+        if (!requestMutex.withLock { activeLoads.add(conversationId) }) return@operation ChatOperationResult.Ignored
+        try {
+            store.resetHistoryCache(conversationId)
+            ChatOperationResult.Completed
+        } finally {
+            // Even cancellation just after the transaction commits must allow a fresh head.
+            withContext(NonCancellable) {
+                requestMutex.withLock {
+                    initializedConversations.remove(conversationId)
+                    activeLoads.remove(conversationId)
+                }
+            }
+        }
+    }
+
     private suspend fun deliver(
         conversationId: String,
         localId: Long,
@@ -120,7 +137,7 @@ class OfflineFirstChatRepository(
                     ?: return@operation ChatOperationResult.Ignored
             }
             val page = remote.getMessages(conversationId, cursor, limit = 20)
-            store.savePage(conversationId, page)
+            store.savePage(conversationId, page, isInitialRefresh = initial)
             if (initial) requestMutex.withLock { initializedConversations.add(conversationId) }
             ChatOperationResult.Completed
         } finally {

@@ -18,6 +18,39 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatHistoryLoadingTest {
+    @Test fun completingLoadBeforeRoomPublishesCursorDoesNotRequestTheOldPageAgain() = runTest {
+        var state by mutableStateOf(ready("100"))
+        val requests = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            historyLoadRequests({ state }, { 121 }, { 120 }).collect(requests::add)
+        }
+        Snapshot.withMutableSnapshot { state = state.copy(olderLoad = HistoryLoadState.Loading) }
+        runCurrent()
+        // The operation completes before Room's independent observation emits its new cursor.
+        Snapshot.withMutableSnapshot { state = state.copy(olderLoad = HistoryLoadState.Idle) }
+        runCurrent()
+        assertEquals(listOf("100"), requests)
+        Snapshot.withMutableSnapshot { state = ready(null).copy(hasMoreHistory = false) }
+        runCurrent()
+        assertEquals(listOf("100"), requests)
+    }
+
+    @Test fun cursorPublishedDuringLoadIsRequestedOnceAfterCompletion() = runTest {
+        var state by mutableStateOf(ready("20"))
+        val requests = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            historyLoadRequests({ state }, { 21 }, { 20 }).collect(requests::add)
+        }
+        Snapshot.withMutableSnapshot { state = state.copy(olderLoad = HistoryLoadState.Loading) }
+        runCurrent()
+        Snapshot.withMutableSnapshot { state = state.copy(nextHistoryCursor = "40") }
+        runCurrent()
+        assertEquals(listOf("20"), requests)
+        Snapshot.withMutableSnapshot { state = state.copy(olderLoad = HistoryLoadState.Idle) }
+        runCurrent()
+        assertEquals(listOf("20", "40"), requests)
+    }
+
     @Test fun stationaryBoundaryRequestsNextCursorEvenWhenTheMessageListDoesNotChange() = runTest {
         var state by mutableStateOf(ready("20"))
         val requests = mutableListOf<String>()

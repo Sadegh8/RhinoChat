@@ -11,6 +11,8 @@ import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.ChatApi
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.FakeChatApi
 import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
 import dev.sadeghtahani.rhinochat.chat.data.repository.OfflineFirstChatRepository
+import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkControls
+import dev.sadeghtahani.rhinochat.demo.data.remote.DemoChatRemoteDataSource
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.viewModel
@@ -27,10 +29,14 @@ class RhinoChatApplication : Application() {
 }
 
 private val chatModule = module {
+    single { DemoNetworkControls() }
     single<ChatLocalStore> { createChatLocalStore(androidContext()) }
-    single<ChatApi> { FakeChatApi() }
+    // Failures are controlled explicitly by the launch screen, outside the unchanged fake.
+    single<ChatApi> { FakeChatApi(failureRate = 0.0) }
     single<ChatRemoteDataSource> {
-        RestartSafeFakeChatRemoteDataSource(AndroidChatRemoteDataSource(get()), get())
+        RestartSafeFakeChatRemoteDataSource(
+            DemoChatRemoteDataSource(AndroidChatRemoteDataSource(get()), get()), get(),
+        )
     }
     single<ChatRepository> { OfflineFirstChatRepository(get(), get()) }
     viewModel { ChatViewModel(get(), conversationId = "rhino-team") }

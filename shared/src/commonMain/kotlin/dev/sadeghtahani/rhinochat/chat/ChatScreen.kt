@@ -66,6 +66,7 @@ import dev.sadeghtahani.rhinochat.chat.components.AdaptiveChatCanvas
 import dev.sadeghtahani.rhinochat.chat.components.ChatHeader
 import dev.sadeghtahani.rhinochat.chat.components.HistoryStatus
 import dev.sadeghtahani.rhinochat.chat.components.MessageBubble
+import dev.sadeghtahani.rhinochat.chat.components.OfflineBanner
 import dev.sadeghtahani.rhinochat.chat.components.MessageComposer
 import dev.sadeghtahani.rhinochat.chat.data.ChatError
 import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
@@ -90,6 +91,7 @@ fun ChatScreen(
     onDismissError: () -> Unit,
     posture: Posture = Posture(),
     modifier: Modifier = Modifier,
+    isOffline: Boolean = false,
 ) {
     val listState = rememberLazyListState()
     val awayFromLatest by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
@@ -135,6 +137,7 @@ fun ChatScreen(
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         if (layout.showHeader) ChatHeader(compact = layout.compactHeader)
+                        if (isOffline) OfflineBanner(Modifier.widthIn(max = 840.dp))
                         if (layout.showHeader && state.messages.isNotEmpty() && state.initialLoad != HistoryLoadState.Idle) {
                             HistoryStatus(state.initialLoad, false, true, onLoadInitial, Modifier.widthIn(max = 840.dp))
                         }
@@ -198,7 +201,7 @@ fun ChatScreen(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.widthIn(max = 840.dp).fillMaxSize(),
+                        modifier = Modifier.widthIn(max = 840.dp).fillMaxSize().testTag("chat-history-list"),
                         state = listState,
                         reverseLayout = true,
                         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
@@ -265,14 +268,14 @@ fun ChatScreen(
 }
 
 @Composable
-internal fun ChatRoute(viewModel: ChatViewModel) {
+internal fun ChatRoute(viewModel: ChatViewModel, isOffline: Boolean = false) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val adaptiveInfo = currentWindowAdaptiveInfoV2()
     ChatScreen(
         state = state, onDraftChanged = viewModel::onDraftChanged, onSend = viewModel::sendMessage,
         onRetryMessage = viewModel::retryMessage, onLoadInitial = viewModel::loadInitialMessages,
         onLoadOlder = viewModel::loadOlderMessages, onDismissError = viewModel::dismissActionError,
-        posture = adaptiveInfo.windowPosture,
+        posture = adaptiveInfo.windowPosture, isOffline = isOffline,
     )
 }
 

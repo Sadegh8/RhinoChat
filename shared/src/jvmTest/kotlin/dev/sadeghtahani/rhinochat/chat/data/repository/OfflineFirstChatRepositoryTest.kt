@@ -167,6 +167,97 @@ class OfflineFirstChatRepositoryTest {
         assertEquals(DeliveryStatus.SENT, reopened.findMessage("chat", pending.localId)?.deliveryStatus)
     }
 
+    @Test fun reopenedCompletedHistoryKeepsItsBeginningWhenFreshHeadConnectsToCache() = runTest {
+        val path = temporaryFolder.newFile().absolutePath
+        val original = openStore(path)
+        remote.seed(120)
+        original.savePage("chat", MessagePage(remote.messages.toList(), null))
+        original.close()
+        stores.remove(original)
+        // One new colleague message is fetched with the refreshed head, connecting to the cache.
+        remote.messages += RemoteMessage("new", null, "colleague", "New message", 1_000)
+        val reopened = openStore(path)
+        val fresh = repository(reopened)
+        assertEquals(ChatOperationResult.Completed, fresh.loadInitialMessages("chat"))
+        assertEquals(PaginationState(true, null), reopened.observePagination("chat").first())
+        repeat(3) { assertEquals(ChatOperationResult.Ignored, fresh.loadOlderMessages("chat")) }
+        assertEquals(listOf<String?>(null), remote.cursors)
+        assertEquals(121, reopened.observeMessages("chat").first().size)
+    }
+
+    @Test fun completedHistoryDoesNotHideAGapBehindCachedAcknowledgements() = runTest {
+        val store = openStore()
+        remote.seed(120)
+        store.savePage("chat", MessagePage(remote.messages.toList(), null))
+        repeat(5) { index ->
+            remote.messages += RemoteMessage("gap-$index", null, "colleague", "Gap $index", 500L + index)
+        }
+        repeat(20) { index ->
+            val pending = store.enqueue("chat", "Sent $index", 2_000L + index)
+            val ack = RemoteMessage("ack-$index", pending.clientId, "me", pending.text, 2_000L + index)
+            store.acknowledge("chat", pending.localId, ack)
+            remote.messages += ack
+        }
+        val fresh = repository(store)
+        assertEquals(ChatOperationResult.Completed, fresh.loadInitialMessages("chat"))
+        assertEquals("20", store.observePagination("chat").first().nextCursor)
+        assertEquals(ChatOperationResult.Completed, fresh.loadOlderMessages("chat"))
+        assertEquals(145, store.observeMessages("chat").first().size)
+    }
+
+    @Test fun completedHistoryDoesNotHideAGapWhenFreshHeadCannotConnectToCache() = runTest {
+        val store = openStore()
+        remote.seed(120)
+        store.savePage("chat", MessagePage(remote.messages.toList(), null))
+        repeat(25) { index ->
+            remote.messages += RemoteMessage("new-$index", null, "colleague", "New $index", 1_000L + index)
+        }
+        val fresh = repository(store)
+        assertEquals(ChatOperationResult.Completed, fresh.loadInitialMessages("chat"))
+        assertEquals("20", store.observePagination("chat").first().nextCursor)
+        assertEquals(ChatOperationResult.Completed, fresh.loadOlderMessages("chat"))
+        assertEquals(145, store.observeMessages("chat").first().size)
+        assertEquals(listOf(null, "20"), remote.cursors)
+    }
+
+    @Test fun resetHistoryCachePreservesOutgoingRowsAndAllowsFreshHeadLoading() = runTest {
+        val store = openStore()
+        remote.seed(45)
+        val repository = repository(store)
+        assertEquals(ChatOperationResult.Completed, repository.loadInitialMessages("chat"))
+        val pending = store.enqueue("chat", "Still sending", 1_000)
+        val failed = store.enqueue("chat", "Retry later", 1_001)
+        store.markFailed("chat", failed.localId)
+        val sent = store.enqueue("chat", "Already delivered", 1_002)
+        store.acknowledge("chat", sent.localId, RemoteMessage("ack", sent.clientId, "me", sent.text, 1_002))
+        store.savePage("other", MessagePage(listOf(RemoteMessage("other", null, "colleague", "Other chat", 0)), null))
+        val outgoing = store.observeMessages("chat").first().filter { it.clientId != null }
+        assertEquals(ChatOperationResult.Completed, repository.resetHistoryCache("chat"))
+        assertEquals(outgoing, store.observeMessages("chat").first())
+        assertEquals(PaginationState(), store.observePagination("chat").first())
+        assertEquals(1, store.observeMessages("other").first().size)
+        assertEquals(DeliveryStatus.SENDING, store.findMessage("chat", pending.localId)?.deliveryStatus)
+        assertEquals(ChatOperationResult.Completed, repository.loadInitialMessages("chat"))
+        assertEquals(PaginationState(true, "20"), store.observePagination("chat").first())
+        assertEquals(23, store.observeMessages("chat").first().size)
+        assertEquals(listOf<String?>(null, null), remote.cursors)
+    }
+
+    @Test fun resetHistoryCacheDoesNotRaceAnActiveHistoryRequest() = runTest {
+        val store = openStore()
+        val repository = repository(store)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        remote.onGet = { _, _ -> started.complete(Unit); release.await(); MessagePage(emptyList(), null) }
+        val loading = async { repository.loadInitialMessages("chat") }
+        started.await()
+        assertEquals(ChatOperationResult.Ignored, repository.resetHistoryCache("chat"))
+        release.complete(Unit)
+        assertEquals(ChatOperationResult.Completed, loading.await())
+        assertEquals(ChatOperationResult.Completed, repository.resetHistoryCache("chat"))
+        assertEquals(PaginationState(), store.observePagination("chat").first())
+    }
+
     @Test fun concurrentHistoryTriggersFetchOnceAndOlderCannotSkipTheHead() = runTest {
         val repository = repository(openStore())
         assertEquals(ChatOperationResult.Ignored, repository.loadOlderMessages("chat"))

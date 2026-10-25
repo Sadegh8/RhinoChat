@@ -38,6 +38,7 @@ internal class ChatUiFixture : ExternalResource() {
     lateinit var store: ChatLocalStore
         private set
     val remote = ControlledChatRemote()
+    val controls = dev.sadeghtahani.rhinochat.demo.data.DemoNetworkControls()
 
     override fun before() {
         val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ChatUiTestApplication
@@ -49,11 +50,14 @@ internal class ChatUiFixture : ExternalResource() {
         this.context = context
         store = createChatLocalStore(context, databaseName)
         val repository = OfflineFirstChatRepository(
-            store, RestartSafeFakeChatRemoteDataSource(remote, store),
+            store, RestartSafeFakeChatRemoteDataSource(
+                dev.sadeghtahani.rhinochat.demo.data.remote.DemoChatRemoteDataSource(remote, controls), store,
+            ),
         )
         startKoin {
             androidContext(context)
             modules(module {
+                single { controls }
                 single<ChatRepository> { repository }
                 viewModel { ChatViewModel(get(), CONVERSATION) }
             })

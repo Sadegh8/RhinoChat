@@ -39,8 +39,17 @@ internal interface ChatMessageDao {
     @Query("SELECT * FROM conversation_pagination WHERE conversationId = :conversationId")
     fun observePagination(conversationId: String): Flow<ConversationPaginationEntity?>
 
+    @Query("SELECT * FROM conversation_pagination WHERE conversationId = :conversationId")
+    suspend fun findPagination(conversationId: String): ConversationPaginationEntity?
+
     @Upsert
     suspend fun upsertPagination(pagination: ConversationPaginationEntity)
+
+    @Query("DELETE FROM messages WHERE conversationId = :conversationId AND clientId IS NULL")
+    suspend fun deleteDownloadedHistory(conversationId: String)
+
+    @Query("DELETE FROM conversation_pagination WHERE conversationId = :conversationId")
+    suspend fun deletePagination(conversationId: String)
 
     @Query("""
         UPDATE messages SET deliveryStatus = 'SENDING'

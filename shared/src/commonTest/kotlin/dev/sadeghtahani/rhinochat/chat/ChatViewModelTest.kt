@@ -295,6 +295,8 @@ class ChatViewModelTest {
     }
 
     private class FakeRepository : ChatRepository {
+        override suspend fun resetHistoryCache(conversationId: String): ChatOperationResult =
+            error("Cache reset is exercised by repository and device tests")
         val messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val pagination = MutableStateFlow(PaginationState())
         val messageObservationError = MutableStateFlow<ChatError?>(null)

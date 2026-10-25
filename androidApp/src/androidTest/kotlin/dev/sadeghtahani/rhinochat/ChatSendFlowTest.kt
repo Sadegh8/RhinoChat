@@ -33,6 +33,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
+import org.junit.Before
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
@@ -46,6 +47,11 @@ class ChatSendFlowTest {
 
     @get:Rule
     val rules: RuleChain = RuleChain.outerRule(fixture).around(ui)
+
+    @Before fun startChat() {
+        assertEquals(0, fixture.remote.historyCalls.get())
+        ui.onNodeWithText("Start app").performClick()
+    }
 
     @Test fun lostReplyThenRapidRetryKeepsOneBubbleOneClientIdentityAndOneServerMessage() {
         loadHistory()

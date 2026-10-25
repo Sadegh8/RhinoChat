@@ -16,4 +16,6 @@ interface ChatRepository {
     /** Fetches the head once per repository session; concurrent/repeated successful loads are ignored. */
     suspend fun loadInitialMessages(conversationId: String): ChatOperationResult
     suspend fun loadOlderMessages(conversationId: String): ChatOperationResult
+    /** Clears downloaded history and pagination, preserving user-created messages; ignored during a load. */
+    suspend fun resetHistoryCache(conversationId: String): ChatOperationResult
 }

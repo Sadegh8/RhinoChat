@@ -73,11 +73,20 @@ class ChatLocalStore internal constructor(
     }
 
     /** Writes history and its cursor atomically, including pages containing only duplicates. */
-    suspend fun savePage(conversationId: String, page: MessagePage) {
+    suspend fun savePage(conversationId: String, page: MessagePage, isInitialRefresh: Boolean = false) {
         require(conversationId.isNotBlank())
         database.withWriteTransaction {
+            // In this append-only history, a head page overlapping an already complete cached
+            // history connects directly to its known beginning. Do not replay all cached offsets.
+            // Client rows alone are insufficient: acknowledgements can exist across a history gap.
+            val previous = if (isInitialRefresh) dao.findPagination(conversationId) else null
+            val keepsKnownBeginning = previous != null && previous.nextCursor == null &&
+                page.messages.any { message ->
+                    message.clientId == null && dao.findByServerId(conversationId, message.id) != null
+                }
             page.messages.forEach { mergeRemoteMessage(conversationId, it) }
-            dao.upsertPagination(ConversationPaginationEntity(conversationId, page.nextCursor))
+            val nextCursor = if (keepsKnownBeginning) null else page.nextCursor
+            dao.upsertPagination(ConversationPaginationEntity(conversationId, nextCursor))
         }
     }
 
@@ -92,6 +101,15 @@ class ChatLocalStore internal constructor(
                 throw MessageIdentityConflictException(conversationId, message.id)
             }
             mergeRemoteMessage(conversationId, message)
+        }
+    }
+
+    /** Reset only downloaded history; retain all user-created outgoing identities and delivery state. */
+    suspend fun resetHistoryCache(conversationId: String) {
+        require(conversationId.isNotBlank())
+        database.withWriteTransaction {
+            dao.deleteDownloadedHistory(conversationId)
+            dao.deletePagination(conversationId)
         }
     }
 

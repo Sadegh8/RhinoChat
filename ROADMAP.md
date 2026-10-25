@@ -255,3 +255,8 @@ Background retry is last: it needs durable queued work, retry/backoff policy, pl
 Prepare to explain the send state machine, why retry identity is persisted, why the database drives the UI, why offset pages overlap, why UDF fits inside MVVM, and why this app does not need feature `api`/`impl` modules. Demonstrate a failure, retry, pagination overlap, rotation, and cold cached reopen. Be ready to change a small behavior without rewriting the architecture.
 
 The strongest submission evidence is a small codebase whose difficult behavior can be demonstrated and explained line by line.
+
+
+### Demo launch controls — 25 October 2026
+
+The Android launch screen now exposes deliberate network faults before chat starts, with all faults off by default. Press Back from chat to edit controls and retry. Faults wrap the unchanged supplied fake, preserve cached messages, and remain separate from repository behavior. See README and validation for controls, session lifetime, and focused evidence.

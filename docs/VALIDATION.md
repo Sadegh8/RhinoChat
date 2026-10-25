@@ -285,3 +285,40 @@ No commit or push was performed. API 24 runtime, accessibility tooling, backgrou
 The user authorized committing the reviewed changes. The final required verification plus shared iOS simulator compilation passed again. There were no unmerged files or conflict markers; source changes include all four executed Pixel send-flow tests. Earlier statements that work was uncommitted describe the review stage. Repository creation and pushing remain with the author.
 
 Android Studio still reports six unresolved-reference diagnostics for Android platform declarations in ChatUiFixture after Gradle sync. The real Kotlin compiler resolves them, the test APK compiles, and all four device tests previously executed successfully. These IDE diagnostics remain a tooling limitation; no suppression or copied production code was added to hide them.
+
+
+### Oldest-history loading correction — 25 October 2026
+
+A focused regression reproduced repeated requests for the same cursor when load completion reached the UI before Room published pagination. Loading and failed states no longer reset cursor distinctness. Moving away from the history boundary still rearms loading; a genuinely new cursor still advances even when cached messages do not change, and a null cursor stops requests.
+
+The new delayed-cursor regression failed before the fix. After the fix, seven ChatHistoryLoadingTest cases and the existing real Room/supplied-fake full-history case passed (eight executions, zero failures/errors/skips). The debug APK built. Per the user's request, the full verification suite was not rerun. The supplied fake retains its intentional 20% network failure rate; genuine failed pages still require explicit retry.
+
+
+### Launch test controls — 25 October 2026
+
+Android now opens a common Compose test-controls screen before creating the chat ViewModel or loading history. Start app opens chat; Android Back returns to controls while retaining the Activity-owned ViewModel. Process-owned settings survive recreation and reset on process restart. Controls affect requests started after a change, without deleting saved messages. All faults default to off: offline, failed sends, failed history, added 3-second latency, a lost first successful delivery reply per client identity, and opt-in 20% random failure. The supplied fake source remains unchanged; its built-in failures are disabled and the surrounding demo transport owns selectable faults.
+
+Five focused fault-injection tests passed, covering operation-specific blocking, recovery, post-commit lost replies/idempotent retry, opt-in random failures, timing, and cancellation. Debug app and test APKs compiled. One Compose instrumentation scenario passed on the USB-selected Pixel: no history request before Start; offline history/send fail before reaching transport; Back changes controls; the same persisted message retries successfully and history recovers. The initial run selected both USB and wireless connections to the same phone and failed; the explicitly USB-selected rerun passed. No full-suite rerun was performed, following the user's validation constraint.
+
+
+### Remembering the beginning across chat startup — 25 October 2026
+
+The cursor-trigger fix alone did not prevent startup from discarding a previously reached beginning. A fresh head refresh overwrote a complete cache's null cursor with offset 20, forcing several simulated network requests through already cached pages when scrolling up. The local page transaction now retains the known beginning if the fresh head overlaps a cached history-only row. This is valid for the demo's append-only history. Acknowledged outgoing rows alone do not establish continuity, since they can exist across an unfilled history gap. A head without a trustworthy overlap falls back to normal pagination. No schema change, database clearing, artificial timeout, or supplied-fake change is involved.
+
+Focused results: three real Room/repository regressions passed (complete cache after database reopen and a fresh incoming message, a genuine new-history gap, and a gap hidden behind cached outgoing acknowledgements). One USB-selected Pixel Compose test passed: arrange all 120 actual fake messages in the isolated database, start chat and refresh the head, scroll to the oldest item, assert the beginning label and no loading indicator, and assert exactly two transport reads (one setup read and one fresh head, zero older-page requests). The first device attempt was interrupted by the Pixel locking; waking it and rerunning the same single case passed. The updated app/test APKs compiled; no full-suite rerun. Fresh uncached history still requires real simulated page requests before its end is known.
+
+
+### Offline status and history cache reset — 25 October 2026
+
+Chat now displays a themed, persistent offline banner beneath its header while the Go offline control is enabled. It remains visible in compact-height layouts and disappears when that control is disabled. The banner reports the simulated demo state, not physical network connectivity.
+
+Test controls now include Reset cache, with explanatory text and working/success/busy/failure states. Reset atomically deletes only downloaded history rows (no client identity) and the selected conversation's pagination. User-created sent, sending, and failed rows, their identities, drafts, other conversations, network controls, and the fake server remain intact. The repository excludes active history requests while resetting and returns Busy if one is already in progress. It invalidates the head-load claim even if cancellation follows a committed clear. Start app requests a fresh head; a repository whose head is already current ignores repeat starts. The device tests use isolated test databases and do not reset the user's normal cache.
+
+Focused validation: two real Room/repository reset tests passed (preserving outgoing states and other conversations, reloading the head, and refusing reset during an active request). Both affected Pixel UI scenarios passed: completed history -> Reset cache -> no local history/pagination -> Start app -> first 20 messages; and offline banner visibility -> return to controls -> offline disabled -> banner absent -> successful retry/history recovery. The offline scenario was updated to expect automatic head retry on returning from controls, then passed on its own rerun. App and UI-test APK builds passed. The normal demo cache was not cleared by these tests, and the full suite was not rerun.
+
+
+### Commit handoff for demo controls and history fixes — 25 October 2026
+
+The user authorized committing all reviewed changes. Git has no unmerged files or conflict markers, and whitespace checks pass. Common metadata compilation and Android lint passed at handoff; no full-suite rerun was performed. Focused behavior/device evidence is recorded in the entries above.
+
+Android Studio's missing shared Android-source diagnostics remain after a project sync, affecting both RhinoChatApplication and ChatUiFixture (not only the fixture as initially observed). The compiler, APK builds, metadata and lint succeed, and the real device flows execute. These IDE diagnostics are not claimed fixed; no code suppression, copied platform implementation or toolchain upgrade was introduced to hide them.
