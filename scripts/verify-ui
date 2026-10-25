@@ -12,6 +12,6 @@ cd "$project_root"
 
 # Select one transport explicitly when the same phone is connected by USB and Wi-Fi.
 export ANDROID_SERIAL="$device_serial"
-exec ./gradlew :androidApp:connectedDebugAndroidTest \
+exec ./gradlew :androidApp:connectedUiTestAndroidTest \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --console=plain "$@"

@@ -105,11 +105,11 @@ flowchart LR
 - The ViewModel combines repository data with draft and loading state. Expose read-only state and accept explicit actions or methods.
 - Keep initial-load, older-page-load, and per-message delivery states independent. One failed fetch must not erase cached messages or replace the entire conversation with an error screen.
 - The route owns lifecycle-aware collection and integration. The screen accepts values and callbacks; components receive the smallest useful inputs. No repository, ViewModel, or DI container in a message bubble.
-- Keep scroll/focus/animation state local to the UI. Keep the draft in a state owner that survives activity recreation. Process-death draft restoration is a separate optional task.
+- Keep scroll/focus/animation state local to the UI. Room now persists the draft per conversation; the ViewModel keeps its immediate editing state.
 - Start initial loading once per relevant state-holder lifetime, not from composition or a collection callback that restarts whenever the UI resumes.
 - Use structured concurrency. Catch expected transport errors at the adapter/repository boundary and preserve cancellation. Do not hide cancellation in a broad `runCatching`.
 - Keep database transactions short; never hold one open while waiting for the fake network.
-- For the baseline, sends can use ViewModel-owned structured work with explicit interruption recovery. Store intent before I/O, recover abandoned sending rows as retryable, and state clearly that background completion is not guaranteed. Add an application-owned sender/WorkManager only for a justified extension.
+- The baseline uses ViewModel-owned structured work with explicit interruption recovery. Android now adds WorkManager as the justified closed-app retry extension; store intent before I/O, reuse its client identity, and keep storage/identity errors out of automatic network retries.
 
 ## Correctness decisions that matter most
 
@@ -248,7 +248,7 @@ This is the separately tracked showcase selected by the user. Begin it only afte
 
 Four send-flow UI tests now pass on the Pixel 7 Pro. Further optional checks include RTL/dark-mode verification and process-death draft recovery. Native iOS integration can then demonstrate shared behavior if there is separate time and an acceptable remote implementation. Verify it in a simulator with keyboard, safe areas, lifecycle, and accessibility; report native compilation separately from runtime testing.
 
-Background retry is last: it needs durable queued work, retry/backoff policy, platform scheduling, and an honest account of the fake server's reset behavior. A connectivity callback alone does not meet the closed-app requirement, and a fake network failure is independent of real connectivity.
+The baseline left closed-app retry out of scope; the Android follow-up now implements it with WorkManager. A fake network failure remains independent of real device connectivity, and the fake server still resets its in-memory idempotency state.
 
 ## Interview walkthrough
 
@@ -260,3 +260,12 @@ The strongest submission evidence is a small codebase whose difficult behavior c
 ### Demo launch controls — 25 October 2026
 
 The Android launch screen now exposes deliberate network faults before chat starts, with all faults off by default. Press Back from chat to edit controls and retry. Faults wrap the unchanged supplied fake, preserve cached messages, and remain separate from repository behavior. See README and validation for controls, session lifetime, and focused evidence.
+
+
+## Persisted drafts and background retry — 25 October 2026
+
+The optional process-death draft and closed-app retry follow-up is implemented for Android. Drafts are persisted per conversation in Room and are cleared conditionally with the outgoing message transaction. Before committing an outgoing row, the ViewModel awaits durable registration of a unique periodic outbox-repair worker; periodic and startup scans cover the crash gap before per-message work is enqueued. WorkManager also schedules unique, connected-network delivery per message, reuses the persisted client identity through the repository, and retries network failures with exponential backoff. Storage and identity errors remain explicit failed-message states. The Go offline demo control is persisted and applied by the transport after process restart.
+
+The Room schema moved from version 1 to 2 with an auto migration; destructive fallback remains disabled. No tests were added or run for this follow-up at the user's request. The production APK and common metadata compilation passed; see [validation](docs/VALIDATION.md). Process-death and background scheduling still need device runtime verification before claiming OS-level behavior has been exercised.
+
+The hidden persistence test tools are available on the pre-chat controls screen. They prepare a draft without replacing an existing saved draft, reschedule failed network sends with a one-minute delay, and can terminate the app process after an explicit confirmation. These controls support manual process-death and closed-app retry walkthroughs; they do not replace device verification.

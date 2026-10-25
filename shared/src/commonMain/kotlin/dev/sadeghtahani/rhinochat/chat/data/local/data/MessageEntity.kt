@@ -3,6 +3,7 @@ package dev.sadeghtahani.rhinochat.chat.data.local.data
 import androidx.room3.Entity
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
+import dev.sadeghtahani.rhinochat.chat.data.ChatError
 import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
 import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
 
@@ -23,6 +24,7 @@ internal data class MessageEntity(
     val text: String,
     val createdAtMillis: Long,
     val deliveryStatus: DeliveryStatus,
+    val lastDeliveryError: ChatError? = null,
 )
 
 internal fun MessageEntity.asExternalModel() = ChatMessage(

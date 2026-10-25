@@ -1,6 +1,8 @@
 package dev.sadeghtahani.rhinochat.chat.data.local
 
 import androidx.sqlite.SQLiteException
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
 import dev.sadeghtahani.rhinochat.chat.data.MessagePage
 import dev.sadeghtahani.rhinochat.chat.data.PaginationState
@@ -52,6 +54,43 @@ class ChatLocalStoreTest {
         assertEquals("srv-1", messages.first().serverId)
         assertEquals(outgoing.copy(deliveryStatus = DeliveryStatus.FAILED), messages.last())
         assertEquals(PaginationState(true, "20"), store.observePagination("chat").first())
+    }
+
+    @Test
+    fun draftAndOutgoingMessageSurviveReopenWithoutClearingNewerDraft() = runTest {
+        val path = databaseFile()
+        var store = openStore(path)
+        store.saveDraft("chat", "Submitted draft")
+        val first = store.enqueue("chat", "Submitted draft", 100, submittedDraft = "Submitted draft")
+        assertEquals("", store.observeDraft("chat").first())
+
+        store.saveDraft("chat", "Typed afterward")
+        val second = store.enqueue("chat", "Another message", 200, submittedDraft = "Submitted draft")
+        store.close()
+
+        store = openStore(path)
+        assertEquals("Typed afterward", store.observeDraft("chat").first())
+        assertEquals(first, store.findMessage("chat", first.localId))
+        assertEquals(second, store.findMessage("chat", second.localId))
+    }
+
+    @Test
+    fun versionOneDatabaseMigratesMessagesAndPaginationIntoVersionTwo() = runTest {
+        val path = databaseFile()
+        createVersionOneDatabase(path.absolutePath)
+
+        val store = openStore(path)
+        val messages = store.observeMessages("chat").first()
+        assertEquals(1, messages.size)
+        assertEquals("client-1", messages.single().clientId)
+        assertEquals("Keep this failed message", messages.single().text)
+        assertEquals(DeliveryStatus.FAILED, messages.single().deliveryStatus)
+        assertNull(store.findLastDeliveryError("chat", messages.single().localId))
+        assertEquals(PaginationState(true, "20"), store.observePagination("chat").first())
+        assertEquals("", store.observeDraft("chat").first())
+
+        store.saveDraft("chat", "Draft after migration")
+        assertEquals("Draft after migration", store.observeDraft("chat").first())
     }
 
     @Test
@@ -215,6 +254,32 @@ class ChatLocalStoreTest {
     }
 
     private fun databaseFile() = File(temporaryFolder.newFolder(), "chat.db")
+
+    private fun createVersionOneDatabase(path: String) {
+        BundledSQLiteDriver().open(path).use { connection ->
+            listOf(
+                """CREATE TABLE IF NOT EXISTS `messages` (`localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `conversationId` TEXT NOT NULL, `clientId` TEXT, `serverId` TEXT, `senderId` TEXT NOT NULL, `text` TEXT NOT NULL, `createdAtMillis` INTEGER NOT NULL, `deliveryStatus` TEXT NOT NULL)""",
+                """CREATE UNIQUE INDEX IF NOT EXISTS `index_messages_conversationId_clientId` ON `messages` (`conversationId`, `clientId`)""",
+                """CREATE UNIQUE INDEX IF NOT EXISTS `index_messages_conversationId_serverId` ON `messages` (`conversationId`, `serverId`)""",
+                """CREATE INDEX IF NOT EXISTS `index_messages_conversationId_createdAtMillis_localId` ON `messages` (`conversationId`, `createdAtMillis`, `localId`)""",
+                """CREATE TABLE IF NOT EXISTS `conversation_pagination` (`conversationId` TEXT NOT NULL, `nextCursor` TEXT, PRIMARY KEY(`conversationId`))""",
+                """CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)""",
+            ).forEach { connection.execute(it) }
+
+            connection.execute(
+                """INSERT INTO `messages` (`localId`, `conversationId`, `clientId`, `serverId`, `senderId`, `text`, `createdAtMillis`, `deliveryStatus`) VALUES (1, 'chat', 'client-1', NULL, 'me', 'Keep this failed message', 100, 'FAILED')""",
+            )
+            connection.execute("INSERT INTO `conversation_pagination` (`conversationId`, `nextCursor`) VALUES ('chat', '20')")
+            connection.execute(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, '2bb5a6e8e659b7627412ad9054ca7177')",
+            )
+            connection.execute("PRAGMA user_version = 1")
+        }
+    }
+
+    private fun SQLiteConnection.execute(sql: String) {
+        prepare(sql).use { it.step() }
+    }
 
     private fun openStore(file: File = databaseFile()): ChatLocalStore {
         database = buildChatDatabase(file.absolutePath)

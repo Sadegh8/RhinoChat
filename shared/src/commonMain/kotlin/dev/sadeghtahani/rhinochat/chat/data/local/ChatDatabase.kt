@@ -1,16 +1,19 @@
 package dev.sadeghtahani.rhinochat.chat.data.local
 
+import androidx.room3.AutoMigration
 import androidx.room3.ConstructedBy
 import androidx.room3.Database
 import androidx.room3.RoomDatabase
 import androidx.room3.RoomDatabaseConstructor
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationDraftEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationPaginationEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.MessageEntity
 
 @Database(
-    entities = [MessageEntity::class, ConversationPaginationEntity::class],
-    version = 1,
+    entities = [MessageEntity::class, ConversationPaginationEntity::class, ConversationDraftEntity::class],
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
     exportSchema = true,
 )
 @ConstructedBy(ChatDatabaseConstructor::class)

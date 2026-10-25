@@ -16,6 +16,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
     implementation(libs.koin.compose.viewmodel)
+    implementation(libs.androidx.work.runtime)
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
@@ -25,6 +26,7 @@ dependencies {
     // Compose UI tests otherwise bring Espresso 3.5, whose input reflection fails on API 37.
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.uiTestJunit4)
+    androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(libs.coroutines.core)
 }
 
@@ -46,6 +48,11 @@ android {
         }
     }
     buildTypes {
+        create("uiTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".uitest"
+            matchingFallbacks += "debug"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -54,6 +61,7 @@ android {
             )
         }
     }
+    testBuildType = "uiTest"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

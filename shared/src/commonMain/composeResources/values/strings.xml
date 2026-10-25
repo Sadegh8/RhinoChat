@@ -40,7 +40,7 @@
     <string name="demo_random">Random network failures</string>
     <string name="demo_random_detail">20% chance per request. Off gives a reliable connection.</string>
     <string name="demo_reset">Reset controls</string>
-    <string name="demo_return_hint">Press Back from chat to change these controls, then retry. Changes affect new requests. Controls reset when the app process restarts.</string>
+    <string name="demo_return_hint">Press Back from chat to change these controls, then retry. Changes affect new requests and are remembered after the app restarts.</string>
     <string name="demo_start">Start app</string>
     <string name="offline_title">You’re offline</string>
     <string name="offline_detail">Saved messages are available. Turn off offline mode in Test controls to send again.</string>
@@ -50,4 +50,22 @@
     <string name="demo_cache_done">History cache cleared. Start app to load it again.</string>
     <string name="demo_cache_busy">History is still loading. Please try again when it finishes.</string>
     <string name="demo_cache_failed">Couldn’t clear history cache. Please try again.</string>
+    <string name="demo_advanced_tools">Persistence test tools</string>
+    <string name="demo_advanced_tools_detail">Prepare a Room draft, delay pending retries, or stop the app process to check recovery.</string>
+    <string name="demo_prepare_draft_probe">Prepare draft recovery sample</string>
+    <string name="demo_prepare_draft_probe_detail">Writes a recognizable draft only if this conversation has no saved draft.</string>
+    <string name="demo_schedule_retry_probe">Delay failed retries for 1 minute</string>
+    <string name="demo_schedule_retry_probe_detail">Send with Go offline enabled and wait for Failed. Turn it off, queue the retry here, keep the device connected, and close the app before the delay ends.</string>
+    <string name="demo_kill_process_probe">Stop app process</string>
+    <string name="demo_kill_process_probe_detail">Reopen from the launcher to check the saved draft. Do not use Android’s Force stop when checking background work.</string>
+    <string name="demo_probe_working">Preparing persistence check…</string>
+    <string name="demo_probe_draft_ready">Draft sample saved. Start the conversation to see it before restarting.</string>
+    <string name="demo_probe_draft_exists">A saved draft already exists. It was left untouched.</string>
+    <string name="demo_probe_retries_scheduled">Failed network sends are queued for about one minute from now.</string>
+    <string name="demo_probe_no_retries">No failed network sends are available to queue.</string>
+    <string name="demo_probe_failed">Couldn’t prepare the persistence check.</string>
+    <string name="demo_kill_process_title">Stop the app process?</string>
+    <string name="demo_kill_process_message">Saved Room drafts and WorkManager jobs remain on disk. Reopen Rhino Chat from the launcher to continue the check.</string>
+    <string name="demo_kill_process_confirm">Stop process</string>
+    <string name="demo_kill_process_cancel">Cancel</string>
 </resources>

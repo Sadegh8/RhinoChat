@@ -6,7 +6,7 @@ cd "$project_root"
 
 exec ./gradlew \
     :androidApp:assembleDebug \
-    :androidApp:assembleDebugAndroidTest \
+    :androidApp:assembleUiTestAndroidTest \
     :shared:testAndroidHostTest \
     :shared:jvmTest \
     :shared:compileCommonMainKotlinMetadata \

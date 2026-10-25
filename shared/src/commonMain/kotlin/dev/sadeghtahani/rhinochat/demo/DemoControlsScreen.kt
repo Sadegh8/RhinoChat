@@ -6,6 +6,10 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -13,6 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkSettings
 import dev.sadeghtahani.rhinochat.demo.data.CacheResetStatus
+import dev.sadeghtahani.rhinochat.demo.data.PersistenceProbeStatus
 import dev.sadeghtahani.rhinochat.theme.RhinoChatTheme
 import org.jetbrains.compose.resources.stringResource
 import rhinochat.shared.generated.resources.*
@@ -25,7 +30,13 @@ fun DemoControlsScreen(
     onResetCache: () -> Unit,
     cacheResetStatus: CacheResetStatus = CacheResetStatus.Idle,
     modifier: Modifier = Modifier,
+    persistenceProbeStatus: PersistenceProbeStatus = PersistenceProbeStatus.Idle,
+    onPrepareDraftProbe: () -> Unit = {},
+    onScheduleRetryProbe: () -> Unit = {},
+    onStopAppProcess: () -> Unit = {},
 ) {
+    var advancedToolsExpanded by remember { mutableStateOf(false) }
+    var confirmProcessStop by remember { mutableStateOf(false) }
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.safeDrawingPadding().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(
@@ -62,12 +73,87 @@ fun DemoControlsScreen(
                         statusLabel?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
                     }
                 }
+                OutlinedCard {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = { advancedToolsExpanded = !advancedToolsExpanded },
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            Text(stringResource(Res.string.demo_advanced_tools))
+                        }
+                        Text(
+                            stringResource(Res.string.demo_advanced_tools_detail),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (advancedToolsExpanded) {
+                            OutlinedButton(
+                                onClick = onPrepareDraftProbe,
+                                enabled = persistenceProbeStatus != PersistenceProbeStatus.Working,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(stringResource(Res.string.demo_prepare_draft_probe)) }
+                            Text(
+                                stringResource(Res.string.demo_prepare_draft_probe_detail),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedButton(
+                                onClick = onScheduleRetryProbe,
+                                enabled = persistenceProbeStatus != PersistenceProbeStatus.Working,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(stringResource(Res.string.demo_schedule_retry_probe)) }
+                            Text(
+                                stringResource(Res.string.demo_schedule_retry_probe_detail),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedButton(
+                                onClick = { confirmProcessStop = true },
+                                enabled = persistenceProbeStatus != PersistenceProbeStatus.Working,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(stringResource(Res.string.demo_kill_process_probe)) }
+                            Text(
+                                stringResource(Res.string.demo_kill_process_probe_detail),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            val probeStatusLabel = when (persistenceProbeStatus) {
+                                PersistenceProbeStatus.Idle -> null
+                                PersistenceProbeStatus.Working -> Res.string.demo_probe_working
+                                PersistenceProbeStatus.DraftPrepared -> Res.string.demo_probe_draft_ready
+                                PersistenceProbeStatus.DraftAlreadyExists -> Res.string.demo_probe_draft_exists
+                                PersistenceProbeStatus.RetriesScheduled -> Res.string.demo_probe_retries_scheduled
+                                PersistenceProbeStatus.NoRetries -> Res.string.demo_probe_no_retries
+                                PersistenceProbeStatus.Failed -> Res.string.demo_probe_failed
+                            }
+                            probeStatusLabel?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                }
                 Text(stringResource(Res.string.demo_return_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(onClick = onStart, enabled = cacheResetStatus != CacheResetStatus.Working, modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(vertical = 16.dp).heightIn(min = 56.dp)) {
                 Text(stringResource(Res.string.demo_start))
             }
         }
+    }
+    if (confirmProcessStop) {
+        AlertDialog(
+            onDismissRequest = { confirmProcessStop = false },
+            title = { Text(stringResource(Res.string.demo_kill_process_title)) },
+            text = { Text(stringResource(Res.string.demo_kill_process_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmProcessStop = false
+                    onStopAppProcess()
+                }) { Text(stringResource(Res.string.demo_kill_process_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmProcessStop = false }) {
+                    Text(stringResource(Res.string.demo_kill_process_cancel))
+                }
+            },
+        )
     }
 }
 

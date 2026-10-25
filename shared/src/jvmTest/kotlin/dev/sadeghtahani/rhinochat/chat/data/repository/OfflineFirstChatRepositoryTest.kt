@@ -40,6 +40,54 @@ class OfflineFirstChatRepositoryTest {
 
     @After fun closeStores() = stores.forEach(ChatLocalStore::close)
 
+    @Test fun automaticRecoveryDeliversAnOrphanSendingRowInAnInitializedRepository() = runTest {
+        val store = openStore()
+        val repository = repository(store)
+        val pending = repository.enqueueMessage("chat", "Owner disappeared before send")
+        assertEquals(ChatOperationResult.Completed, repository.resumePendingMessage("chat", pending.localId))
+        assertEquals(listOf(pending.clientId), remote.sentClientIds)
+        assertEquals(DeliveryStatus.SENT, store.findMessage("chat", pending.localId)?.deliveryStatus)
+        assertEquals(ChatOperationResult.Ignored, repository.resumePendingMessage("chat", pending.localId))
+        assertEquals(1, remote.sentClientIds.size)
+    }
+
+    @Test fun automaticRecoveryCoalescesWithLiveSendWithoutRecoveringOtherActiveRows() = runTest {
+        val store = openStore()
+        val repository = repository(store)
+        val active = repository.enqueueMessage("chat", "Active")
+        val orphan = repository.enqueueMessage("chat", "Orphan")
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        remote.onSend = { clientId, text ->
+            if (clientId == active.clientId) { started.complete(Unit); release.await() }
+            remote.commit(clientId, text)
+        }
+        val sending = async { repository.sendPendingMessage("chat", active.localId) }
+        started.await()
+        assertEquals(ChatOperationResult.Ignored, repository.resumePendingMessage("chat", active.localId))
+        assertEquals(ChatOperationResult.Completed, repository.resumePendingMessage("chat", orphan.localId))
+        assertEquals(DeliveryStatus.SENDING, store.findMessage("chat", active.localId)?.deliveryStatus)
+        release.complete(Unit)
+        assertEquals(ChatOperationResult.Completed, sending.await())
+        assertEquals(listOf(active.clientId, orphan.clientId), remote.sentClientIds)
+    }
+
+    @Test fun automaticRecoveryRetriesNetworkErrorsButLeavesPermanentFailuresForManualRetry() = runTest {
+        val store = openStore()
+        val repository = repository(store)
+        for (error in ChatError.entries) {
+            val pending = repository.enqueueMessage("chat", "Failure $error")
+            store.markFailed("chat", pending.localId, error)
+            val expected = if (error == ChatError.NETWORK) ChatOperationResult.Completed else ChatOperationResult.Ignored
+            assertEquals(expected, repository.resumePendingMessage("chat", pending.localId))
+            if (expected == ChatOperationResult.Ignored) {
+                assertEquals(error, store.findLastDeliveryError("chat", pending.localId))
+                assertEquals(ChatOperationResult.Completed, repository.retryMessage("chat", pending.localId))
+            }
+        }
+        assertEquals(ChatError.entries.size, remote.sentClientIds.size)
+    }
+
     @Test fun optimisticRowExistsBeforeNetworkAndRetainsItsKeyAfterAcknowledgement() = runTest {
         val store = openStore()
         val repository = repository(store)

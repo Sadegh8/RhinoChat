@@ -3,6 +3,8 @@ package dev.sadeghtahani.rhinochat.testing
 import android.app.Application
 import android.app.ActivityManager
 import android.content.Context
+import androidx.work.Configuration
+import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.AndroidJUnitRunner
 
@@ -18,6 +20,12 @@ class ChatUiTestApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        check(packageName.endsWith(".uitest")) { "Instrumentation must target the isolated test app" }
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            this,
+            Configuration.Builder().build(),
+            WorkManagerTestInitHelper.ExecutorsMode.PRESERVE_EXECUTORS,
+        )
         bootstrap = ChatUiFixture().also { it.start(this) }
     }
 

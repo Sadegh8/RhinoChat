@@ -178,6 +178,14 @@ Official guidance read before implementation: [JetBrains adaptive layouts](https
 
 Use `currentWindowAdaptiveInfoV2` at the route boundary, actual available window space, and separating/occluding hinge geometry in window coordinates. Compact height needs its own treatment, including landscape and keyboard space. A single conversation does not justify inventing a second feature pane: keep book chat clear of the hinge and use upper history/lower input in tabletop when both halves fit. See validation for the distinction between geometry checks, preview compilation, and device runtime evidence.
 
+## WorkManager retries and persisted drafts: 25 October 2026
+
+Checked the official [WorkManager getting started guide](https://developer.android.com/develop/background-work/background-tasks/persistent/getting-started), [work request constraints and backoff guidance](https://developer.android.com/develop/background-work/background-tasks/persistent/getting-started/define-work), [unique work guidance](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/manage-work), and [release notes](https://developer.android.com/jetpack/androidx/releases/work). The current stable version selected for the Android host is 2.12.0.
+
+Decision: keep immediate delivery in the shared ViewModel and use one unique one-time `CoroutineWorker` per outgoing Room row, constrained to `NetworkType.CONNECTED`. The worker calls the shared repository with the same local row/client identity and uses exponential backoff for network failures. Await registration of a unique periodic outbox-repair worker before committing new outgoing rows; periodic and startup scans cover the crash gap before per-message work is enqueued. The persisted demo offline control is applied by the transport, which records interrupted sends as retryable network failures instead of leaving them `SENDING`. Storage/identity failures terminate automatic retries for explicit handling. WorkManager can delay execution; force-stop pauses work until the app is opened again.
+
+Room schema version 2 adds a per-conversation draft and stores the last delivery error so startup can select retryable rows without rescheduling permanent failures. Sending atomically writes the message and clears only the exact submitted draft. The KMP shared store remains the only owner of these persisted values.
+
 ## Remaining decisions
 
 - Toolchain, previews, common metadata, build, lint, database tests, repository tests, and ViewModel tests now have [recorded evidence](VALIDATION.md).
@@ -195,3 +203,10 @@ Decision: keep Koin in `androidApp`, using `koin-android` and the multiplatform 
 The Android CLI's official lazy-list guidance ([Google lists](https://developer.android.com/develop/ui/compose/lists)) was read for layout observation and stable keys. The prior automatic trigger required `isScrollInProgress`; it could stop at a stationary boundary. Observe eligibility plus the next cursor so duplicate-only pages still progress after head refresh. Idle-only eligibility prevents automatic error retry loops. Keep real request loading visible outside the lazy status row and preserve its measured space during retry; do not add delays to inflate the spinner.
 
 The supplied fake's source confirms that it resets 120 seed rows and allocates new outgoing `srv-N` by list size. A durable client-based namespace in a demo-specific adapter resolves cross-process ID reuse without editing the fake, clearing Room, or relaxing common content/client conflict checks. A one-time atomic compatibility conversion handles already acknowledged raw IDs. This cannot restore the fake's lost server-side idempotency history.
+
+
+## WorkManager test isolation and send recovery: 25 October 2026
+
+Followed the official [custom initialization guide](https://developer.android.com/develop/background-work/background-tasks/persistent/configuration/custom-configuration) to remove only WorkManager's App Startup initializer, retaining other Startup components. Production explicitly initializes WorkManager after Koin; the separate uiTest target uses WorkManagerTestInitHelper with an in-memory database and TestScheduler. Inspection of the pinned 2.12.0 sources confirms the helper creates an in-memory WorkDatabase; WorkManager startup can still reconcile OS jobs, so a separate application ID is also necessary to keep the normal demo's jobs isolated. No dependency/toolchain upgrade is required.
+
+Automatic delivery claims the same per-message repository slot as immediate/manual delivery, then checks the current status/error before sending. This resumes orphaned SENDING rows after foreground ownership ends without running startup recovery during live sends.

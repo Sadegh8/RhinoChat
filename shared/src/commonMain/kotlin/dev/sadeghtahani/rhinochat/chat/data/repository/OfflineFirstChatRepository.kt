@@ -39,20 +39,55 @@ class OfflineFirstChatRepository(
     override fun observePagination(conversationId: String): Flow<PaginationState> =
         store.observePagination(conversationId).translateStorageErrors()
 
+    override fun observeDraft(conversationId: String): Flow<String> =
+        store.observeDraft(conversationId).translateStorageErrors()
+
+    override suspend fun saveDraft(conversationId: String, text: String) {
+        try {
+            store.saveDraft(conversationId, text)
+        } catch (failure: SQLiteException) {
+            throw ChatDataException(ChatError.STORAGE, failure)
+        }
+    }
+
+    override suspend fun clearDraftIfMatches(conversationId: String, expectedText: String) {
+        try {
+            store.clearDraftIfMatches(conversationId, expectedText)
+        } catch (failure: SQLiteException) {
+            throw ChatDataException(ChatError.STORAGE, failure)
+        }
+    }
+
     override suspend fun enqueueMessage(conversationId: String, text: String): ChatMessage {
+        return enqueueMessage(conversationId, text, submittedDraft = "")
+    }
+
+    override suspend fun enqueueMessage(
+        conversationId: String,
+        text: String,
+        submittedDraft: String,
+    ): ChatMessage {
         try {
             ensureInitialized()
-            return store.enqueue(conversationId, text, clock.now().toEpochMilliseconds())
+            return store.enqueue(
+                conversationId,
+                text,
+                clock.now().toEpochMilliseconds(),
+                submittedDraft.takeIf { it.isNotEmpty() },
+            )
         } catch (failure: SQLiteException) {
             throw ChatDataException(ChatError.STORAGE, failure)
         }
     }
 
     override suspend fun sendPendingMessage(conversationId: String, localId: Long) =
-        deliver(conversationId, localId, retry = false)
+        deliver(conversationId, localId, SendMode.NEW)
 
     override suspend fun retryMessage(conversationId: String, localId: Long) =
-        deliver(conversationId, localId, retry = true)
+        deliver(conversationId, localId, SendMode.MANUAL_RETRY)
+
+    override suspend fun resumePendingMessage(conversationId: String, localId: Long) =
+        deliver(conversationId, localId, SendMode.AUTOMATIC)
 
     override suspend fun loadInitialMessages(conversationId: String) =
         loadPage(conversationId, initial = true)
@@ -80,7 +115,7 @@ class OfflineFirstChatRepository(
     private suspend fun deliver(
         conversationId: String,
         localId: Long,
-        retry: Boolean,
+        mode: SendMode,
     ): ChatOperationResult = operation {
         ensureInitialized()
         val key = conversationId to localId
@@ -89,10 +124,19 @@ class OfflineFirstChatRepository(
             val message = store.findMessage(conversationId, localId)
                 ?: return@operation ChatOperationResult.Ignored
             val clientId = message.clientId ?: return@operation ChatOperationResult.Ignored
-            if (retry) {
-                if (!store.beginRetry(conversationId, localId)) return@operation ChatOperationResult.Ignored
-            } else if (message.deliveryStatus != DeliveryStatus.SENDING) {
-                return@operation ChatOperationResult.Ignored
+            when (message.deliveryStatus) {
+                DeliveryStatus.SENT -> return@operation ChatOperationResult.Ignored
+                DeliveryStatus.SENDING -> {
+                    if (mode == SendMode.MANUAL_RETRY) return@operation ChatOperationResult.Ignored
+                }
+                DeliveryStatus.FAILED -> {
+                    if (mode == SendMode.NEW) return@operation ChatOperationResult.Ignored
+                    if (mode == SendMode.AUTOMATIC) {
+                        val error = store.findLastDeliveryError(conversationId, localId)
+                        if (error != null && error != ChatError.NETWORK) return@operation ChatOperationResult.Ignored
+                    }
+                    if (!store.beginRetry(conversationId, localId)) return@operation ChatOperationResult.Ignored
+                }
             }
 
             try {
@@ -110,7 +154,7 @@ class OfflineFirstChatRepository(
             // Includes cancellation just after a retry's local state transition commits.
             withContext(NonCancellable) {
                 try {
-                    store.markFailed(conversationId, localId)
+                    store.markFailed(conversationId, localId, ChatError.NETWORK)
                 } catch (cleanupFailure: Exception) {
                     cancelled.addSuppressed(cleanupFailure)
                 }
@@ -122,6 +166,8 @@ class OfflineFirstChatRepository(
             }
         }
     }
+
+    private enum class SendMode { NEW, MANUAL_RETRY, AUTOMATIC }
 
     private suspend fun loadPage(conversationId: String, initial: Boolean): ChatOperationResult = operation {
         require(conversationId.isNotBlank())
@@ -152,7 +198,7 @@ class OfflineFirstChatRepository(
         localId: Long,
         error: ChatError,
     ): ChatOperationResult {
-        store.markFailed(conversationId, localId)
+        store.markFailed(conversationId, localId, error)
         // History may have confirmed delivery while a send response was being lost.
         return if (store.findMessage(conversationId, localId)?.deliveryStatus == DeliveryStatus.SENT) {
             ChatOperationResult.Completed

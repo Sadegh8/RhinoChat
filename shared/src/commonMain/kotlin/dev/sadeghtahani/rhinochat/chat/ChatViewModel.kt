@@ -10,6 +10,8 @@ import dev.sadeghtahani.rhinochat.chat.data.ChatOperationState
 import dev.sadeghtahani.rhinochat.chat.data.ChatUiState
 import dev.sadeghtahani.rhinochat.chat.data.HistoryLoadState
 import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -26,9 +29,11 @@ import kotlinx.coroutines.launch
 class ChatViewModel(
     private val repository: ChatRepository,
     private val conversationId: String,
+    private val retryScheduler: OutgoingMessageRetryScheduler = NoopOutgoingMessageRetryScheduler,
 ) : ViewModel() {
     private val draft = MutableStateFlow("")
     private var draftVersion = 0L
+    private val draftMutationMutex = Mutex()
     private val operations = MutableStateFlow(ChatOperationState())
     private val observationAttempt = MutableStateFlow(0L)
 
@@ -65,13 +70,24 @@ class ChatViewModel(
 
     init {
         require(conversationId.isNotBlank())
+        restoreDraft()
         loadInitialMessages()
     }
 
     fun onDraftChanged(text: String) {
-        draftVersion++
+        val version = ++draftVersion
         draft.value = text
         dismissActionError()
+        viewModelScope.launch {
+            draftMutationMutex.withLock {
+                if (version != draftVersion) return@withLock
+                try {
+                    repository.saveDraft(conversationId, text)
+                } catch (failure: ChatDataException) {
+                    operations.update { it.copy(actionError = failure.error) }
+                }
+            }
+        }
     }
 
     fun sendMessage() {
@@ -81,8 +97,11 @@ class ChatViewModel(
         operations.update { it.copy(isEnqueueing = true, actionError = null) }
         viewModelScope.launch {
             val message = try {
-                repository.enqueueMessage(conversationId, text).also {
-                    if (draftVersion == submittedVersion) draft.value = ""
+                retryScheduler.ensureOutboxRecoveryScheduled()
+                draftMutationMutex.withLock {
+                    repository.enqueueMessage(conversationId, text, submittedDraft = text).also {
+                        if (draftVersion == submittedVersion) draft.value = ""
+                    }
                 }
             } catch (failure: ChatDataException) {
                 operations.update { it.copy(actionError = failure.error) }
@@ -90,13 +109,17 @@ class ChatViewModel(
             } finally {
                 operations.update { it.copy(isEnqueueing = false) }
             }
+            retryScheduler.schedule(conversationId, message.localId)
             recordSendResult(repository.sendPendingMessage(conversationId, message.localId))
         }
     }
 
     fun retryMessage(localId: Long) {
         dismissActionError()
-        viewModelScope.launch { recordSendResult(repository.retryMessage(conversationId, localId)) }
+        viewModelScope.launch {
+            retryScheduler.schedule(conversationId, localId)
+            recordSendResult(repository.retryMessage(conversationId, localId))
+        }
     }
 
     fun loadInitialMessages() {
@@ -127,6 +150,17 @@ class ChatViewModel(
     private fun recordSendResult(result: ChatOperationResult) {
         if (result is ChatOperationResult.Failed && result.error != ChatError.NETWORK) {
             operations.update { it.copy(actionError = result.error) }
+        }
+    }
+
+    private fun restoreDraft() {
+        viewModelScope.launch {
+            try {
+                val savedDraft = repository.observeDraft(conversationId).first()
+                if (draftVersion == 0L) draft.value = savedDraft
+            } catch (failure: ChatDataException) {
+                operations.update { it.copy(actionError = failure.error) }
+            }
         }
     }
 

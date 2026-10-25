@@ -1,11 +1,15 @@
 package dev.sadeghtahani.rhinochat.chat.data.local
 
 import androidx.room3.withWriteTransaction
+import androidx.sqlite.SQLiteException
+import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.data.ChatError
 import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
 import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
 import dev.sadeghtahani.rhinochat.chat.data.MessagePage
 import dev.sadeghtahani.rhinochat.chat.data.PaginationState
 import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
+import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationDraftEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationPaginationEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.MessageEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.asExternalModel
@@ -40,10 +44,51 @@ class ChatLocalStore internal constructor(
             .distinctUntilChanged()
     }
 
-    suspend fun findMessage(conversationId: String, localId: Long): ChatMessage? =
-        dao.findByLocalId(conversationId, localId)?.asExternalModel()
+    fun observeDraft(conversationId: String): Flow<String> {
+        require(conversationId.isNotBlank())
+        return dao.observeDraft(conversationId)
+            .map { draft -> draft?.text.orEmpty() }
+            .distinctUntilChanged()
+    }
 
-    suspend fun enqueue(conversationId: String, text: String, createdAtMillis: Long): ChatMessage {
+    suspend fun findMessage(conversationId: String, localId: Long): ChatMessage? = try {
+        dao.findByLocalId(conversationId, localId)?.asExternalModel()
+    } catch (failure: SQLiteException) {
+        throw ChatDataException(ChatError.STORAGE, failure)
+    }
+
+    suspend fun findLastDeliveryError(conversationId: String, localId: Long): ChatError? = try {
+        dao.findLastDeliveryError(conversationId, localId)
+    } catch (failure: SQLiteException) {
+        throw ChatDataException(ChatError.STORAGE, failure)
+    }
+
+    suspend fun findRetryableMessages(): List<ChatMessage> = try {
+        dao.findRetryableMessages().map(MessageEntity::asExternalModel)
+    } catch (failure: SQLiteException) {
+        throw ChatDataException(ChatError.STORAGE, failure)
+    }
+
+    suspend fun saveDraft(conversationId: String, text: String) {
+        require(conversationId.isNotBlank())
+        if (text.isEmpty()) {
+            dao.deleteDraft(conversationId)
+        } else {
+            dao.upsertDraft(ConversationDraftEntity(conversationId, text))
+        }
+    }
+
+    suspend fun clearDraftIfMatches(conversationId: String, expectedText: String) {
+        require(conversationId.isNotBlank())
+        dao.clearDraftIfMatches(conversationId, expectedText)
+    }
+
+    suspend fun enqueue(
+        conversationId: String,
+        text: String,
+        createdAtMillis: Long,
+        submittedDraft: String? = null,
+    ): ChatMessage {
         require(conversationId.isNotBlank())
         require(text.isNotBlank())
         val entity = MessageEntity(
@@ -56,13 +101,18 @@ class ChatLocalStore internal constructor(
             deliveryStatus = DeliveryStatus.SENDING,
         )
         return try {
-            entity.copy(localId = dao.insert(entity)).asExternalModel()
+            val localId = database.withWriteTransaction {
+                dao.insert(entity).also {
+                    submittedDraft?.let { submitted -> dao.clearDraftIfMatches(conversationId, submitted) }
+                }
+            }
+            entity.copy(localId = localId).asExternalModel()
         } catch (cancelled: CancellationException) {
             // A commit may precede prompt cancellation of the insert's return to its caller.
             withContext(NonCancellable) {
                 try {
                     dao.findByClientId(conversationId, requireNotNull(entity.clientId))?.let {
-                        dao.markFailed(conversationId, it.localId)
+                        dao.markFailed(conversationId, it.localId, ChatError.NETWORK.name)
                     }
                 } catch (cleanupFailure: Exception) {
                     cancelled.addSuppressed(cleanupFailure)
@@ -117,8 +167,12 @@ class ChatLocalStore internal constructor(
     suspend fun beginRetry(conversationId: String, localId: Long): Boolean =
         dao.beginRetry(conversationId, localId) == 1
 
-    suspend fun markFailed(conversationId: String, localId: Long) {
-        dao.markFailed(conversationId, localId)
+    suspend fun markFailed(
+        conversationId: String,
+        localId: Long,
+        error: ChatError = ChatError.NETWORK,
+    ) {
+        dao.markFailed(conversationId, localId, error.name)
     }
 
     /** Call once at startup, before new sends start; never on screen re-entry. */

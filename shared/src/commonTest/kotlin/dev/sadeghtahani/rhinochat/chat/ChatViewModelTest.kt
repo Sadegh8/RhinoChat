@@ -155,6 +155,14 @@ class ChatViewModelTest {
         assertFalse(vm.uiState.value.isEnqueueing)
     }
 
+    @Test fun durableOutboxRecoveryIsInstalledBeforeTheMessageIsPersisted() = withViewModel { vm, repository ->
+        vm.onDraftChanged("Recover me after process death")
+        vm.sendMessage()
+        runCurrent()
+
+        assertEquals(listOf("recovery", "enqueue", "schedule", "send"), repository.commandOrder)
+    }
+
     @Test fun retryUsesExistingRowAndDatabaseDeliveryStateWithoutCreatingAnotherMessage() = withViewModel { vm, repository ->
         repository.messages.value = listOf(message().copy(deliveryStatus = DeliveryStatus.FAILED))
         vm.retryMessage(1)
@@ -279,7 +287,16 @@ class ChatViewModelTest {
         val owner = ViewModelStore()
         try {
             val repository = FakeRepository().also(prepare)
-            val vm = ChatViewModel(repository, "chat")
+            val retryScheduler = object : OutgoingMessageRetryScheduler {
+                override suspend fun ensureOutboxRecoveryScheduled() {
+                    repository.commandOrder += "recovery"
+                }
+
+                override suspend fun schedule(conversationId: String, localId: Long) {
+                    repository.commandOrder += "schedule"
+                }
+            }
+            val vm = ChatViewModel(repository, "chat", retryScheduler)
             owner.put("chat", vm)
             if (collect) {
                 backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
@@ -295,6 +312,8 @@ class ChatViewModelTest {
     }
 
     private class FakeRepository : ChatRepository {
+        override suspend fun resumePendingMessage(conversationId: String, localId: Long): ChatOperationResult =
+            error("Background recovery is exercised by repository and worker tests")
         override suspend fun resetHistoryCache(conversationId: String): ChatOperationResult =
             error("Cache reset is exercised by repository and device tests")
         val messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -307,6 +326,7 @@ class ChatViewModelTest {
         var olderCalls = 0
         var enqueueCalls = 0
         var sendCalls = 0
+        val commandOrder = mutableListOf<String>()
         val retriedIds = mutableListOf<Long>()
         var initialResult: ChatOperationResult = ChatOperationResult.Completed
         var olderResult: ChatOperationResult = ChatOperationResult.Completed
@@ -326,12 +346,14 @@ class ChatViewModelTest {
         }.onStart { paginationSubscriptions++ }
 
         override suspend fun enqueueMessage(conversationId: String, text: String): ChatMessage {
+            commandOrder += "enqueue"
             enqueueCalls++
             beforeEnqueue()
             return message(enqueueCalls.toLong(), text).also { messages.value += it }
         }
 
         override suspend fun sendPendingMessage(conversationId: String, localId: Long): ChatOperationResult {
+            commandOrder += "send"
             sendCalls++
             beforeSend()
             val status = if (sendResult is ChatOperationResult.Failed) DeliveryStatus.FAILED else DeliveryStatus.SENT

@@ -20,6 +20,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -58,6 +59,7 @@ internal class ChatUiFixture : ExternalResource() {
             androidContext(context)
             modules(module {
                 single { controls }
+                single<ChatLocalStore> { store }
                 single<ChatRepository> { repository }
                 viewModel { ChatViewModel(get(), CONVERSATION) }
             })
@@ -101,6 +103,7 @@ internal class ControlledChatRemote : ChatRemoteDataSource {
     val historyReply = CompletableDeferred<Boolean>()
     val historyCalls = AtomicInteger()
     val attempts = CopyOnWriteArrayList<SendAttempt>()
+    val sendStarted = Channel<SendAttempt>(Channel.UNLIMITED)
 
     override suspend fun getMessages(conversationId: String, cursor: String?, limit: Int): MessagePage {
         if (historyCalls.incrementAndGet() == 1 && !historyReply.await()) {
@@ -112,6 +115,7 @@ internal class ControlledChatRemote : ChatRemoteDataSource {
     override suspend fun sendMessage(conversationId: String, clientId: String, text: String): RemoteMessage {
         val attempt = SendAttempt(clientId, text)
         attempts += attempt
+        sendStarted.send(attempt)
         val reply = attempt.reply.await()
         val committed = delegate.sendMessage(conversationId, clientId, text)
         if (reply == SendReply.COMMIT_THEN_LOSE_REPLY) throw ChatDataException(ChatError.NETWORK)

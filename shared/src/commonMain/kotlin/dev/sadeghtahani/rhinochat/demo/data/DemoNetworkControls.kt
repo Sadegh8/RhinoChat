@@ -14,9 +14,26 @@ data class DemoNetworkSettings(
 
 enum class CacheResetStatus { Idle, Working, Done, Busy, Failed }
 
-/** Process-owned controls; changing them affects the next request, never clears saved messages. */
-class DemoNetworkControls {
-    private val mutableSettings = MutableStateFlow(DemoNetworkSettings())
+enum class PersistenceProbeStatus {
+    Idle,
+    Working,
+    DraftPrepared,
+    DraftAlreadyExists,
+    RetriesScheduled,
+    NoRetries,
+    Failed,
+}
+
+/** App-owned controls; changing them affects the next request and never clears saved messages. */
+class DemoNetworkControls(
+    initialSettings: DemoNetworkSettings = DemoNetworkSettings(),
+    private val persistSettings: (DemoNetworkSettings) -> Unit = {},
+) {
+    private val mutableSettings = MutableStateFlow(initialSettings)
     val settings = mutableSettings.asStateFlow()
-    fun update(settings: DemoNetworkSettings) { mutableSettings.value = settings }
+
+    fun update(settings: DemoNetworkSettings) {
+        mutableSettings.value = settings
+        persistSettings(settings)
+    }
 }
