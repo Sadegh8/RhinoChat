@@ -94,8 +94,13 @@ fun ChatScreen(
     isOffline: Boolean = false,
 ) {
     val listState = rememberLazyListState()
-    val awayFromLatest by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val nearLatestOffset = with(LocalDensity.current) { 32.dp.roundToPx() }
+    val awayFromLatest by remember(nearLatestOffset) {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > nearLatestOffset
+        }
+    }
     val layoutDirection = LocalLayoutDirection.current
     val scope = rememberCoroutineScope()
     val latestState by rememberUpdatedState(state)
@@ -112,7 +117,9 @@ fun ChatScreen(
         if (previousNewestId != null && newestId != previousNewestId && wasAtLatest &&
             listState.firstVisibleItemScrollOffset < nearLatestOffset && !listState.isScrollInProgress
         ) {
-            listState.animateScrollToItem(0)
+            // New messages enter at index 0 in this reverse-layout list. Jumping here keeps
+            // the latest row anchored without competing with its placement animation.
+            listState.scrollToItem(0)
         }
         previousNewestId = newestId
     }
@@ -257,7 +264,7 @@ fun ChatScreen(
                     enter = fadeIn(RhinoMotion.effects()) + slideInVertically(RhinoMotion.spatial()) { it / 2 },
                     exit = fadeOut(RhinoMotion.effects()) + slideOutVertically(RhinoMotion.spatial()) { it / 2 },
                 ) {
-                    FilledTonalButton(onClick = { scope.launch { listState.animateScrollToItem(0) } }) {
+                    FilledTonalButton(onClick = { scope.launch { listState.scrollToItem(0) } }) {
                         Icon(painterResource(Res.drawable.arrow_downward), null, Modifier.size(18.dp))
                         Text(stringResource(Res.string.latest_messages), modifier = Modifier.padding(start = 8.dp))
                     }

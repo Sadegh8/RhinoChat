@@ -218,6 +218,7 @@ The JVM test target compiles the actual Android transport directory alongside th
 | `./scripts/verify :shared:compileKotlinIosSimulatorArm64`, JDK 21 | Passed: debug APK, common metadata, Android host/JVM suites, lint, shared iOS simulator compilation |
 | Android host suite | 35 executions; zero failures/errors/skips |
 | JVM suite | 62 executions; zero failures/errors/skips |
+
 | Distinct cases | 65; 32 common cases run on both targets, giving 97 executions |
 | Lint | Zero errors; the same six existing warnings |
 | Compiler | Existing Room generated expect/actual beta warnings remain |
@@ -396,3 +397,15 @@ The user authorized committing the remaining changes. The pagination/default-fai
 ### GitHub README and screenshots — 25 October 2026
 
 The author supplied an updated overall effort estimate of approximately four hours and shared the private repository at https://github.com/Sadegh8/RhinoChat. README now uses that estimate and replaces the earlier pending-repository notes. Two unmodified Pixel 7 Pro captures in docs/screenshots show the conversation and pre-chat controls; both were visually inspected. Existing saved random-failure overrides were off during capture. No cache was cleared and no messages were sent for the screenshots. At the author's request, README was shortened to retain setup, architecture/identity decisions, tests, deferred work and AI disclosure, with detailed evidence linked here. Documentation/image changes do not establish additional behavioral coverage; no tests were rerun for them.
+
+### Chat latest-message scrolling — 25 October 2026
+
+Current Android Compose guidance recommends limiting recomposition from fast-changing scroll state, supplying stable lazy-list keys/content types, and distinguishes immediate `scrollToItem()` from animated `animateScrollToItem()`. This screen already uses `derivedStateOf`, stable message IDs, and content types. Its latest-message button nevertheless animated across the full history, and its visibility check only considered the first visible item index, so moving within the newest row did not reveal the button. The long animated jump could also compete with the placement animation when the latest message changed.
+
+The latest-message button and automatic follow now use `scrollToItem(0)` in the reverse-layout list, anchoring the newest message without a full-history smooth-scroll. Button visibility now also reacts when the first visible row has moved more than 32 dp from its latest-position offset. The derivation still gates composition updates to the boolean threshold and uses APIs supported by the pinned Compose 1.12.1 runtime.
+
+| Check | Actual result |
+| --- | --- |
+| `:androidApp:assembleDebug :shared:compileCommonMainKotlinMetadata` | Passed with JDK 21; existing Room expect/actual beta warnings remain |
+| `git diff --check` | Passed |
+| Device/runtime scroll feel and frame timing | Not re-measured in this change; build success does not establish perceived smoothness or frame performance |
