@@ -2,19 +2,19 @@ package dev.sadeghtahani.rhinochat.testing
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.sadeghtahani.rhinochat.chat.ChatViewModel
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
-import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
-import dev.sadeghtahani.rhinochat.chat.data.MessagePage
-import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
+import dev.sadeghtahani.rhinochat.chat.presentation.ChatViewModel
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.MessagePage
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.RemoteMessage
 import dev.sadeghtahani.rhinochat.chat.data.local.ChatLocalStore
 import dev.sadeghtahani.rhinochat.chat.data.local.createChatLocalStore
 import dev.sadeghtahani.rhinochat.chat.data.remote.AndroidChatRemoteDataSource
 import dev.sadeghtahani.rhinochat.chat.data.remote.ChatRemoteDataSource
 import dev.sadeghtahani.rhinochat.chat.data.remote.RestartSafeFakeChatRemoteDataSource
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.FakeChatApi
-import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
+import dev.sadeghtahani.rhinochat.chat.domain.repository.ChatRepository
 import dev.sadeghtahani.rhinochat.chat.data.repository.OfflineFirstChatRepository
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList

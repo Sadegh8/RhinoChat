@@ -1,7 +1,7 @@
 package dev.sadeghtahani.rhinochat.chat.data.remote
 
-import dev.sadeghtahani.rhinochat.chat.data.MessagePage
-import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.MessagePage
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.RemoteMessage
 import dev.sadeghtahani.rhinochat.chat.data.local.ChatLocalStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

@@ -269,3 +269,8 @@ The optional process-death draft and closed-app retry follow-up is implemented f
 The Room schema moved from version 1 to 2 with an auto migration; destructive fallback remains disabled. No tests were added or run for this follow-up at the user's request. The production APK and common metadata compilation passed; see [validation](docs/VALIDATION.md). Process-death and background scheduling still need device runtime verification before claiming OS-level behavior has been exercised.
 
 The hidden persistence test tools are available on the pre-chat controls screen. They prepare a draft without replacing an existing saved draft, reschedule failed network sends with a one-minute delay, and can terminate the app process after an explicit confirmation. These controls support manual process-death and closed-app retry walkthroughs; they do not replace device verification.
+
+
+### Chat layer packages — 25 October 2026
+
+The user requested a clearer feature-first data/domain/presentation structure. Chat business models and repository/scheduler contracts now live in domain; local/transport code and repository implementation remain in data; UI state, screens, ViewModel, components and layout/formatting code live in presentation. Common presentation tests and platform timestamp actuals follow their owners. This is a package refactor within existing modules, with no behavior or Room schema changes. Current placement guidance and preview paths are recorded in AGENTS, README and ARCHITECTURE.

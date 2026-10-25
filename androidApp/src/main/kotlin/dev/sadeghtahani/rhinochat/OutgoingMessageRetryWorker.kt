@@ -3,12 +3,12 @@ package dev.sadeghtahani.rhinochat
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
-import dev.sadeghtahani.rhinochat.chat.data.ChatOperationResult
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatOperationResult
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
 import dev.sadeghtahani.rhinochat.chat.data.local.ChatLocalStore
-import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
+import dev.sadeghtahani.rhinochat.chat.domain.repository.ChatRepository
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 

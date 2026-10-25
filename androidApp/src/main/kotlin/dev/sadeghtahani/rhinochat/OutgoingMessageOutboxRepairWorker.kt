@@ -3,7 +3,7 @@ package dev.sadeghtahani.rhinochat
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
 import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject

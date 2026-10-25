@@ -14,10 +14,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import dev.sadeghtahani.rhinochat.chat.data.ChatOperationResult
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
-import dev.sadeghtahani.rhinochat.chat.ChatViewModel
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatOperationResult
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.repository.ChatRepository
+import dev.sadeghtahani.rhinochat.chat.presentation.ChatViewModel
 import dev.sadeghtahani.rhinochat.demo.data.CacheResetStatus
 import dev.sadeghtahani.rhinochat.demo.data.PersistenceProbeStatus
 import kotlinx.coroutines.flow.first

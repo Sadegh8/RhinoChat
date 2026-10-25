@@ -15,7 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
 import dev.sadeghtahani.rhinochat.testing.ChatUiFixture
 import dev.sadeghtahani.rhinochat.testing.SendReply
 import org.junit.Assert.assertEquals
@@ -52,7 +52,7 @@ class DemoControlsFlowTest {
         ui.onNodeWithText("Reset cache").performScrollTo().performClick()
         waitForText("History cache cleared. Start app to load it again.")
         runBlocking {
-            assertEquals(emptyList<dev.sadeghtahani.rhinochat.chat.data.ChatMessage>(), fixture.store.observeMessages(ChatUiFixture.CONVERSATION).first())
+            assertEquals(emptyList<dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage>(), fixture.store.observeMessages(ChatUiFixture.CONVERSATION).first())
             assertEquals(false, fixture.store.observePagination(ChatUiFixture.CONVERSATION).first().hasLoadedInitialPage)
         }
         assertEquals(2, fixture.remote.historyCalls.get())

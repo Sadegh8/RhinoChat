@@ -3,10 +3,10 @@ package dev.sadeghtahani.rhinochat.chat.data.local
 import androidx.sqlite.SQLiteException
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
-import dev.sadeghtahani.rhinochat.chat.data.MessagePage
-import dev.sadeghtahani.rhinochat.chat.data.PaginationState
-import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.MessagePage
+import dev.sadeghtahani.rhinochat.chat.domain.model.PaginationState
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.RemoteMessage
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

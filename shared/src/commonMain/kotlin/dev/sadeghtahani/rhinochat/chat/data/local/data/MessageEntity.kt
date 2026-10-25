@@ -3,9 +3,9 @@ package dev.sadeghtahani.rhinochat.chat.data.local.data
 import androidx.room3.Entity
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
-import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
 
 @Entity(
     tableName = "messages",

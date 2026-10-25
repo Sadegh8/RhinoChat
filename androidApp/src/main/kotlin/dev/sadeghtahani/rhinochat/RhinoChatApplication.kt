@@ -5,9 +5,9 @@ import android.content.Context
 import android.util.Log
 import androidx.work.Configuration
 import androidx.work.WorkManager
-import dev.sadeghtahani.rhinochat.chat.ChatViewModel
-import dev.sadeghtahani.rhinochat.chat.OutgoingMessageRetryScheduler
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.presentation.ChatViewModel
+import dev.sadeghtahani.rhinochat.chat.domain.scheduler.OutgoingMessageRetryScheduler
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
 import dev.sadeghtahani.rhinochat.chat.data.local.ChatLocalStore
 import dev.sadeghtahani.rhinochat.chat.data.local.createChatLocalStore
 import dev.sadeghtahani.rhinochat.chat.data.remote.AndroidChatRemoteDataSource
@@ -15,7 +15,7 @@ import dev.sadeghtahani.rhinochat.chat.data.remote.ChatRemoteDataSource
 import dev.sadeghtahani.rhinochat.chat.data.remote.RestartSafeFakeChatRemoteDataSource
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.ChatApi
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.FakeChatApi
-import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
+import dev.sadeghtahani.rhinochat.chat.domain.repository.ChatRepository
 import dev.sadeghtahani.rhinochat.chat.data.repository.OfflineFirstChatRepository
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkControls
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkSettings

@@ -24,8 +24,8 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
-import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
 import dev.sadeghtahani.rhinochat.testing.ChatUiFixture
 import dev.sadeghtahani.rhinochat.testing.SendReply
 import org.junit.Assert.assertEquals

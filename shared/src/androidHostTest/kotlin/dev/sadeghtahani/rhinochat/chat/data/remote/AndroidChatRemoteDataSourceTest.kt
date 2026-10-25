@@ -1,7 +1,7 @@
 package dev.sadeghtahani.rhinochat.chat.data.remote
 
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.ChatApi
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.FakeChatApi
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.MessageDto

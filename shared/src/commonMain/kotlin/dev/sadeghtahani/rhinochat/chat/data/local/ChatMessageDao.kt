@@ -5,7 +5,7 @@ import androidx.room3.Insert
 import androidx.room3.Query
 import androidx.room3.Update
 import androidx.room3.Upsert
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationDraftEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationPaginationEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.MessageEntity

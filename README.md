@@ -46,6 +46,10 @@ This selects one transport explicitly, useful when the same phone is connected o
 
 `ChatSendFlowTest` launches the actual `MainActivity` and uses the real ViewModel, repository, file-backed Room, and supplied fake's idempotency. A test-only transport gates replies and can lose an acknowledgement after a real server commit. UI assertions check Sending/Failed/Retry/Sent, blank input, draft clearing/retention, same-text intentional sends, out-of-order replies, Activity recreation with requests held open, and history failure/recovery. Database keys/client identities, remote attempt counts, and server copies are checked alongside visible bubbles. A custom runner starts a clean Koin graph before the Activity; every test gets a uniquely named database and deletes only that database afterward. The app uses the unchanged fake with failures controlled by the launch screen and retains its normal cache.
 
+## Chat package structure
+
+The chat feature keeps its layers inside `shared`: `chat/domain` contains plain business models, the repository contract and the retry-scheduler contract; `chat/data` contains their implementation, Room/local code and remote adapters/models; `chat/presentation` contains the screen, ViewModel, components, UI state and layout/formatting helpers. Presentation uses domain contracts and data implements them. Android hosts wiring and WorkManager. The Room database package and exported schemas stay stable. There are no additional modules or pass-through use cases. See [architecture](docs/ARCHITECTURE.md).
+
 ## Send, retry, and history
 
 Room is the source of messages and per-conversation drafts. Sending atomically commits a row with a new UUID and clears only the matching submitted draft; a draft typed afterward remains saved. The ViewModel immediately attempts delivery. Acknowledgement merges into the same local key and sets `SENT`. Expected failure leaves `FAILED`; retry claims that row and reuses its persisted UUID/text. Repeated retry taps share one in-flight attempt.
@@ -64,7 +68,7 @@ The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ## Chat UI and previews
 
-Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/ChatScreen.kt` in Android Studio and select Split or Design. It is ordered: stateless `ChatScreen`, lifecycle-aware `ChatRoute`, then private previews and fixtures. The Android host obtains one lifecycle-owned ViewModel from Koin and passes it to shared `App`. Substantial bubbles, composer, history status, header, and action-error UI live in `chat/components`; their previews stay beside the component.
+Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/presentation/ChatScreen.kt` in Android Studio and select Split or Design. It is ordered: stateless `ChatScreen`, lifecycle-aware `ChatRoute`, then private previews and fixtures. The Android host obtains one lifecycle-owned ViewModel from Koin and passes it to shared `App`. Substantial bubbles, composer, history status, header, and action-error UI live in `chat/presentation/components`; their previews stay beside the component.
 
 The twelve screen previews cover light/dark, cached errors, loading, empty, RTL with larger text, tablet portrait/landscape, phone landscape, a short keyboard viewport, book fold, and tabletop using the real `RhinoChatTheme` and fixed data. The original seven variants were rendered and visually inspected before the adaptive extension; the final twelve-variant set compiles but has not all been visually inspected. The CLI preview exporter remains unreliable, so use the IDE panel; see [validation notes](docs/VALIDATION.md). Preview callbacks are intentionally inert; the application uses real ViewModel callbacks. Android-backed previews do not verify iOS runtime behavior.
 

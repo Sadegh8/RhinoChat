@@ -5,10 +5,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
-import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
-import dev.sadeghtahani.rhinochat.chat.data.repository.ChatRepository
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.domain.repository.ChatRepository
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkSettings
 import dev.sadeghtahani.rhinochat.testing.ChatUiFixture
 import dev.sadeghtahani.rhinochat.testing.SendReply

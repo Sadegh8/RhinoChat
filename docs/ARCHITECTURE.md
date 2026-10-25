@@ -5,31 +5,39 @@ Persistence, repository orchestration, the ViewModel, and chat UI are implemente
 ## Packages and boundaries
 
 ```text
-chat/data/
-  ChatMessage.kt                    Plain model consumed by other layers
-  DeliveryStatus.kt
-  RemoteMessage.kt                  Platform-neutral input for server reconciliation
-  MessagePage.kt
-  PaginationState.kt
-  ChatUiState.kt                    Screen state, independent history load states
-  ChatOperationResult.kt            Completed, ignored, or expected failure
-  ChatError.kt                      Shared errors; no Android exceptions in presentation
-  repository/
-    ChatRepository.kt              Presentation's observation/command boundary
-    OfflineFirstChatRepository.kt   Sends, retry claims, history requests and startup recovery
-  remote/
-    ChatRemoteDataSource.kt         Platform-neutral remote boundary
-  local/
-    ChatDatabase.kt                 Internal Room database, constructor, common configuration
-    ChatMessageDao.kt               Internal SQL operations and database observations
-    ChatLocalStore.kt               Local transactions and mapping to external models
-    MessageIdentityConflictException.kt
-    data/
-      MessageEntity.kt
-      ConversationPaginationEntity.kt
+chat/
+  domain/
+    model/                         ChatMessage, DeliveryStatus, ChatError/ChatDataException,
+                                   ChatOperationResult, PaginationState
+    repository/ChatRepository.kt   Observations and commands shared by UI and workers
+    scheduler/                     OutgoingMessageRetryScheduler platform contract
+  data/
+    repository/                    OfflineFirstChatRepository: claims, history and recovery
+    remote/
+      ChatRemoteDataSource.kt      Transport boundary
+      model/                       RemoteMessage and MessagePage
+    local/
+      ChatDatabase.kt              Internal Room database; package and schema identity unchanged
+      ChatMessageDao.kt            Internal SQL and observations
+      ChatLocalStore.kt            Transactions and mapping to domain models
+      MessageIdentityConflictException.kt
+      data/                        MessageEntity, ConversationPaginationEntity,
+                                   ConversationDraftEntity
+  presentation/
+    ChatScreen.kt                  Stateless screen, route, then colocated previews
+    ChatViewModel.kt                UI state and foreground command ownership
+    ChatHistoryLoading.kt          Viewport/cursor observation
+    ChatLayout.kt                  Adaptive layout policy
+    MessageTimestamp.kt            Platform formatting contract and source-set actuals
+    components/                    Theme-based components and their previews
+    model/                         ChatUiState, HistoryLoadState, ChatOperationState,
+                                   ChatCacheState, ChatLayout, MessageTimestamp
 ```
 
-`chat/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` starts a single Koin graph, lazily resolving one store, supplied `FakeChatApi()`, restart-safe remote adapter, and repository for the process. `MainActivity` resolves the Activity-owned ViewModel with `koinViewModel()` and passes it into shared `App`. Dependencies remain constructor parameters; common screens/components/previews never access Koin. The graph uses the classic lambda DSL without a compiler plugin. Koin is confined to the Android composition root; iOS wiring remains separate. `ChatRoute` collects with `collectAsStateWithLifecycle` and forwards actions. The adapter and supplied API stay in Android sources; Java APIs stay outside common code.
+Domain has no dependencies on data/presentation packages, Android, Compose, Room, or WorkManager. Presentation consumes domain models and contracts. Data implements the repository contract and maps transport/persistence values into domain models. Koin wiring and WorkManager implementations remain in androidApp. The domain scheduling contract coordinates durable outbox recovery without bringing WorkManager into common code. Packages provide an explicit ownership boundary within the existing modules; no wrapper use cases were introduced.
+
+
+`chat/presentation/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` starts a single Koin graph, lazily resolving one store, supplied `FakeChatApi(failureRate = 0.0)` with faults controlled by the surrounding demo adapter, restart-safe remote adapter, and repository for the process. `MainActivity` resolves the Activity-owned ViewModel with `koinViewModel()` and passes it into shared `App`. Dependencies remain constructor parameters; common screens/components/previews never access Koin. The graph uses the classic lambda DSL without a compiler plugin. Koin is confined to the Android composition root; iOS wiring remains separate. `ChatRoute` collects with `collectAsStateWithLifecycle` and forwards actions. The adapter and supplied API stay in Android sources; Java APIs stay outside common code.
 
 Android and iOS provide `createChatLocalStore` factories in platform source sets. Android uses the application's database directory; iOS uses Application Support. Each platform calls its own `Room.databaseBuilder`, then applies common bundled-SQLite configuration. The store's owner closes it when that owner ends; a screen must not open a database during composition. Android's store has process lifetime. iOS still needs its own remote adapter and host wiring.
 
@@ -58,7 +66,7 @@ Identical text is not an identity. Two deliberate sends of the same text create 
 - `markFailed`: only changes sending rows, so a late failure cannot regress a confirmed sent row.
 - `recoverInterruptedMessages`: changes abandoned sending rows to failed/retryable. Call once at application startup, before starting new sends, never on each route entry. It does not schedule background work.
 
-The database drives `observeMessages` and `observePagination`; there is no parallel mutable message list. Observations map entities to plain values and omit equal repeats. Database reads/writes use Room's coroutine support and default I/O context. Transactions contain local operations only.
+The database drives `observeMessages`, `observePagination`, and saved per-conversation drafts; there is no parallel mutable message list. Observations map entities to plain values and omit equal repeats. Database reads/writes use Room's coroutine support and default I/O context. Transactions contain local operations only.
 
 ## Reconciliation and conflicts
 
@@ -74,7 +82,7 @@ This policy is specific to this demo; it does not weaken the common merge checks
 
 The ViewModel exposes immutable `StateFlow<ChatUiState>` from repository observations, its draft, and operation state. Sharing uses `WhileSubscribed(5_000)`; initial loading starts in the ViewModel once, independently of collectors. A rotation must reuse the same ViewModel. A new draft edit increments a version, so even retyping identical text during a pending local write prevents the old send from clearing that new draft.
 
-Local enqueue completes before sending remotely. The short enqueue guard coalesces duplicate taps but releases before the network call, allowing another deliberate message while an earlier send waits. Room updates the delivery status. The ViewModel holds no second mutable message list. Initial-load, older-load, and row delivery failures are independent; a history error retains cached chat.
+Local enqueue completes before sending remotely. The short enqueue guard coalesces duplicate taps but releases before the network call, allowing another deliberate message while an earlier send waits. Room updates the delivery status. The ViewModel holds no second mutable message list. Its draft is restored from Room and edits are persisted per conversation; enqueue clears only the matching submitted draft within the outgoing-row transaction. Initial-load, older-load, and row delivery failures are independent; a history error retains cached chat.
 
 Repository request sets coalesce work per outgoing row and per conversation. Their mutex covers claims only, never network I/O. Retry also uses the database's conditional failed-to-sending update. A late failure checks the persisted state: if history already confirmed the row, it remains sent.
 
@@ -119,3 +127,7 @@ Database isolation alone does not prevent Gradle's default post-test APK uninsta
 Tests cover reopen persistence, stable local/client identity, duplicate history, concurrent retry claims, acknowledgement/history merging, conversation-scoped constraints, interrupted sends, live observations, and page/cursor rollback. See [validation results](VALIDATION.md) for actual runs and remaining boundaries.
 
 References: [Room KMP setup](https://developer.android.com/kotlin/multiplatform/room), [Room 3 stable release and migration differences](https://developer.android.com/jetpack/androidx/releases/room3), [Google's database testing guidance](https://developer.android.com/training/data-storage/room/testing-db), [Now in Android architecture](https://github.com/android/nowinandroid/blob/main/docs/ArchitectureLearningJourney.md).
+
+## Persistent delivery and device-test boundaries
+
+Android schedules per-message WorkManager requests and a durable periodic outbox repair before persisting a new outgoing row. Foreground, manual retry and automatic resume share the repository's per-message send claim. Automatic resume can deliver orphaned Sending rows in a live process and excludes storage/identity failures. Production WorkManager initializes after Koin; instrumentation uses the separate uiTest application ID with an in-memory WorkManager/TestScheduler and isolated named Room databases. The new package boundaries preserve those lifetimes and all stored identities.

@@ -12,10 +12,10 @@ import androidx.work.Operation
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import dev.sadeghtahani.rhinochat.chat.OutgoingMessageRetryScheduler
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.domain.scheduler.OutgoingMessageRetryScheduler
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
 import dev.sadeghtahani.rhinochat.chat.data.local.ChatLocalStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

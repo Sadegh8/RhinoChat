@@ -2,13 +2,13 @@ package dev.sadeghtahani.rhinochat.chat.data.local
 
 import androidx.room3.withWriteTransaction
 import androidx.sqlite.SQLiteException
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.ChatError
-import dev.sadeghtahani.rhinochat.chat.data.ChatMessage
-import dev.sadeghtahani.rhinochat.chat.data.DeliveryStatus
-import dev.sadeghtahani.rhinochat.chat.data.MessagePage
-import dev.sadeghtahani.rhinochat.chat.data.PaginationState
-import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.MessagePage
+import dev.sadeghtahani.rhinochat.chat.domain.model.PaginationState
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.RemoteMessage
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationDraftEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.ConversationPaginationEntity
 import dev.sadeghtahani.rhinochat.chat.data.local.data.MessageEntity

@@ -1,8 +1,8 @@
 package dev.sadeghtahani.rhinochat.demo
 
-import dev.sadeghtahani.rhinochat.chat.data.ChatDataException
-import dev.sadeghtahani.rhinochat.chat.data.MessagePage
-import dev.sadeghtahani.rhinochat.chat.data.RemoteMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatDataException
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.MessagePage
+import dev.sadeghtahani.rhinochat.chat.data.remote.model.RemoteMessage
 import dev.sadeghtahani.rhinochat.chat.data.remote.ChatRemoteDataSource
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkControls
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkSettings
