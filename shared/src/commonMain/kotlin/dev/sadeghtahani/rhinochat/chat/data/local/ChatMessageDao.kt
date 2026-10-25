@@ -56,4 +56,12 @@ internal interface ChatMessageDao {
 
     @Query("UPDATE messages SET deliveryStatus = 'FAILED' WHERE deliveryStatus = 'SENDING'")
     suspend fun recoverInterruptedMessages(): Int
+
+    // The supplied demo server reuses srv-N after restart. Only its acknowledged client rows
+    // need conversion; seed history and pending rows retain their existing identities.
+    @Query("""
+        UPDATE messages SET serverId = 'fake-client:' || clientId
+        WHERE clientId IS NOT NULL AND serverId LIKE 'srv-%'
+    """)
+    suspend fun namespaceDemoAcknowledgements(): Int
 }

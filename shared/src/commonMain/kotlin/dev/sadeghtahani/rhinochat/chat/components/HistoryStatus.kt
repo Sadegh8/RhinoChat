@@ -3,6 +3,7 @@ package dev.sadeghtahani.rhinochat.chat.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -12,8 +13,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -34,8 +41,13 @@ internal fun HistoryStatus(
     onLoad: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val density = LocalDensity.current
+    var reservedHeightPx by remember { mutableIntStateOf(0) }
     Column(
-        modifier = modifier.padding(12.dp),
+        // Keep a visible error/retry slot from collapsing into a small spinner. At the oldest
+        // edge, a shorter list would clamp the scroll offset before the page can extend it.
+        modifier = modifier.onSizeChanged { reservedHeightPx = maxOf(reservedHeightPx, it.height) }
+            .heightIn(min = with(density) { reservedHeightPx.toDp() }).padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

@@ -6,6 +6,7 @@ data class ChatUiState(
     val initialLoad: HistoryLoadState = HistoryLoadState.Loading,
     val olderLoad: HistoryLoadState = HistoryLoadState.Idle,
     val hasMoreHistory: Boolean = false,
+    val nextHistoryCursor: String? = null,
     val isEnqueueing: Boolean = false,
     val actionError: ChatError? = null,
 )

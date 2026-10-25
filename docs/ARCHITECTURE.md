@@ -29,7 +29,7 @@ chat/data/
       ConversationPaginationEntity.kt
 ```
 
-`chat/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` lazily constructs one repository/store/adapter/`FakeChatApi()` for the application's lifetime. `MainActivity` passes that repository to shared `App`, which creates a lifecycle-owned ViewModel with an explicit initializer. `ChatRoute` collects with `collectAsStateWithLifecycle` and forwards actions. The adapter and supplied API stay in Android sources; Java APIs stay outside common code.
+`chat/ChatViewModel.kt` owns draft and operation state. Android's `RhinoChatApplication` starts a single Koin graph, lazily resolving one store, supplied `FakeChatApi()`, restart-safe remote adapter, and repository for the process. `MainActivity` resolves the Activity-owned ViewModel with `koinViewModel()` and passes it into shared `App`. Dependencies remain constructor parameters; common screens/components/previews never access Koin. The graph uses the classic lambda DSL without a compiler plugin. Koin is confined to the Android composition root; iOS wiring remains separate. `ChatRoute` collects with `collectAsStateWithLifecycle` and forwards actions. The adapter and supplied API stay in Android sources; Java APIs stay outside common code.
 
 Android and iOS provide `createChatLocalStore` factories in platform source sets. Android uses the application's database directory; iOS uses Application Support. Each platform calls its own `Room.databaseBuilder`, then applies common bundled-SQLite configuration. The store's owner closes it when that owner ends; a screen must not open a database during composition. Android's store has process lifetime. iOS still needs its own remote adapter and host wiring.
 
@@ -43,7 +43,7 @@ For screens, keep stateless rendering, the stateful entry point, and previews in
 | --- | --- |
 | `localId: Long` | SQLite-generated stable row/UI key. It survives acknowledgement and retry. |
 | `clientId: String?` | UUID created once when enqueueing an outgoing message and persisted before remote work. The server receives this same value on every attempt. Historical messages can lack it. |
-| `serverId: String?` | Server-assigned identity, absent before acknowledgement. Used to merge overlapping history. |
+| `serverId: String?` | Remote adapter identity, absent before acknowledgement. Used to merge overlapping history. The fake-specific adapter canonicalizes outgoing IDs by client identity; production adapters should use durable backend IDs. |
 
 Unique indexes enforce `(conversationId, clientId)` and `(conversationId, serverId)` when the corresponding identity is non-null. SQLite permits multiple nulls, so multiple pending messages and historical messages without client IDs can coexist.
 
@@ -66,7 +66,9 @@ The merge first finds a row by client identity, then server identity. When both 
 
 The supplied fake treats messages as immutable. Reusing an established identity for different client identity, server identity, text, or sender is reported as `MessageIdentityConflictException`. A page conflict rolls back all rows and the cursor together; no cached message is silently replaced.
 
-The fake loses its server state on process restart and can reuse server IDs. The repository reports `IDENTITY_CONFLICT` and preserves cached messages; it cannot preserve server-side idempotency across a server reset. Supporting editable server messages or a server-session namespace would require an explicit policy beyond this fake's contract.
+The fake loses its server state on process restart and reuses server IDs. Android wraps the unchanged transport adapter with `RestartSafeFakeChatRemoteDataSource`: client-bearing acknowledgements/history use `fake-client:<clientId>`, while the 120 seed messages retain `srv-N`. A mutex-protected preparation step atomically converts legacy acknowledged `srv-*` cache IDs before normalized remote data can merge. This changes only the adapter ID: local/client keys, text, timestamps and delivery status remain intact. Pending rows are untouched, and retry sends the same client ID and text. The conversion needs no schema change or destructive fallback.
+
+This policy is specific to this demo; it does not weaken the common merge checks or reinterpret identity conflicts as network errors. Reused client identity with different text/sender still fails, and pages/cursors still roll back together. Previously sent rows stay cached without replaying them into a fresh fake. The client cannot restore lost server idempotency or promise exactly-once delivery after a fake reset.
 
 ## Send lifecycle and state production
 
@@ -90,7 +92,7 @@ A new repository refreshes the head with a null cursor before permitting older l
 
 ## Compose ownership and motion
 
-`ChatScreen.kt` contains stateless business-state rendering, `ChatRoute`, and private previews in that order. Scroll, focus, interaction, and animation state are local presentation concerns. The screen does not start network loads during composition: a `snapshotFlow` observes approaching the older boundary while scrolling, then dispatches a guarded ViewModel command. Failed older loads require explicit retry rather than a repeated automatic loop.
+`ChatScreen.kt` contains stateless business-state rendering, `ChatRoute`, and private previews in that order. Scroll, focus, interaction, and animation state are local presentation concerns. The screen does not start network loads during composition: a `snapshotFlow` observes the older boundary and the next cursor, independently of active gestures, then dispatches a guarded ViewModel command. Cursor progress retriggers duplicate-only cached pages even if the list does not change or a short Loading/Idle emission is coalesced. The history status retains its maximum measured height while composed, preventing retry from shrinking content at the scroll limit; the header reserves its progress-strip height. Loading indicators reflect actual requests without minimum-duration delays. Failed older loads require explicit retry rather than a repeated automatic loop.
 
 The list reverses Room's oldest-first values for `reverseLayout`, placing newest at the bottom with stable `localId` keys. Older pages extend the far end. A new latest row follows the viewport only if the reader was already at the latest end; browsing history keeps its anchor and exposes an explicit jump control. The lazy state is saveable across activity recreation. Draft/request state remains in the retained ViewModel.
 

@@ -17,7 +17,7 @@ Use an Android-first Compose Multiplatform project with two Gradle modules: `and
 
 Use MVVM with unidirectional data flow, immutable UI snapshots, and explicit message transitions. An MVI framework is unnecessary for this screen. MVVM and UDF are compatible; a sealed action type does not require a store/reducer/effect framework.
 
-Use Room with a local database as the source of rendered messages. Prefer constructor injection and a small manual composition root. Use explicit cursor pagination for this bounded fake API. Do not introduce Navigation 3 until there is a second destination.
+Use Room with a local database as the source of rendered messages. Keep constructor injection with a small Koin composition root at the Android host (updated at the user's request after the adaptive milestone). Use explicit cursor pagination for this bounded fake API. Do not introduce Navigation 3 until there is a second destination.
 
 These choices are project judgments, not requirements imposed by Google or JetBrains. If the CMP setup cannot build, run tests, and render a preview within the initial setup budget, preserve the Android delivery by using a single Android app module with the same logical boundaries.
 
@@ -145,7 +145,7 @@ The fake has insertion but no deletion. Do not promise correctness under arbitra
 - Persist unsent identity, text, and status. After restart, a message left sending by an interrupted owner must become retryable rather than spin forever.
 - Render cached messages before any successful fetch. A load failure must leave the cache available.
 - The fake is an in-memory server: restarting its process loses sent messages and idempotency history. New sends can reuse `srv-120`, `srv-121`, etc. from a previous run. Avoid overwriting a different cached message on a conflicting server identity; characterize this with a test and document the demo policy before implementing the merge.
-- Conservative baseline policy: preserve the cached outgoing rows and surface/log a conflicting remote identity rather than silently replacing content. A proper server/session identity namespace is a larger demo extension. Exactly-once behavior across fake-server resets cannot be guaranteed by the client alone.
+- Follow-up demo policy: normalize outgoing remote IDs to `fake-client:<persisted clientId>` in the Android adapter and atomically convert legacy acknowledged cache IDs before remote merging. Seed history keeps its IDs; local row keys, text, pending state, and retry identity are preserved. Common content/client identity conflicts remain errors. The original conservative policy exposed repeated conflicts after restart and is superseded for the fake-specific graph. Exactly-once behavior across fake-server resets cannot be guaranteed by the client alone.
 - The fake uses delay/random failure, not sockets. Airplane mode alone does not force it to fail. Use injected/scripted transport failures and a cold reopen of the local database to prove the error and cache behavior.
 
 ## Clean code, SOLID, and reuse at this scale
@@ -177,7 +177,7 @@ Persistence progress: Room schema version 1, plain external models, stable local
 
 Reliable-behavior progress: the supplied Android fake and adapter, application-owned repository, shared ViewModel, optimistic send/retry, serialized history loading, cancellation/restart recovery, and correctness tests are committed as `3421ebd` after user approval.
 
-Compose integration progress: Android now opens the real chat. Shared rendering, lifecycle collection, message/composer/history components, theme, spring transitions, insets, dates, stable scroll keys, explicit jump/load/retry actions, and twelve screen previews are implemented. Adaptive window/hinge layouts cover phone landscape, tablets, book fold, tabletop, and short keyboard space. User review has identified repeated send conflicts and unreliable automatic older loading; resolving those is the next correctness milestone. See [validation](docs/VALIDATION.md) for actual device/preview evidence and limits.
+Compose integration progress: Android now opens the real chat. Shared rendering, lifecycle collection, message/composer/history components, theme, spring transitions, insets, dates, stable scroll keys, explicit jump/load/retry actions, and twelve screen previews are implemented. Adaptive window/hinge layouts cover phone landscape, tablets, book fold, tabletop, and short keyboard space. This milestone was committed as `7986d27`. The subsequent corrective milestone adds fake-specific outgoing identity normalization, stationary/cursor-aware older loading, stable loading-status space, and a small Koin graph. It uses focused builds and runtime inspection; no further test suites were added or run, as requested. See [validation](docs/VALIDATION.md) for actual device/preview evidence and limits.
 
 Tests are added alongside each behavior; the verification allocation completes the integration checks. These estimates assume a functioning local Android toolchain and cached dependencies.
 

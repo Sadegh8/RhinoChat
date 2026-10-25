@@ -2,7 +2,7 @@
 
 An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-Current milestone: Compose integration, previews, and adaptive layouts. Android opens a conversation backed by Room and the supplied fake API, with optimistic sends, retry, older history, keyboard handling, and shared previews. User review has identified repeated send failures after restart and unreliable automatic older loading; these remain open correctness issues for the next milestone. The optional iOS host still displays the foundation screen pending its own remote integration.
+Current milestone: restart-safe demo sends, reliable history triggering, and a small Koin composition root. Android opens a conversation backed by Room and the supplied fake API, with optimistic sends, retry, older history, adaptive layouts, and shared previews. The reported restart collisions and stationary history trigger are addressed; focused build/runtime evidence and remaining limits are recorded in [validation](docs/VALIDATION.md). The optional iOS host still displays the foundation screen pending its own remote integration.
 
 ## Project layout
 
@@ -40,17 +40,19 @@ Room is the source of messages. Sending first commits a row with a new UUID and 
 
 History requests fetch 20 at a time, with one request per conversation. Each page merges by identity and commits its returned cursor in the same transaction. Duplicate-only pages still advance; failures retain the cache and cursor. A fresh repository refreshes from the head before using any saved offset.
 
-The application owns one repository/store/fake API instance; the ViewModel owns request lifetimes. Cancellation propagates and in-flight sends become retryable. A new repository recovers interrupted sending rows before its first command. There is no background sender or process-death draft restoration. The supplied fake remains at its default 20% failure rate; its in-memory server resets across process restarts and can reuse server IDs. Conflicting cached identities are preserved and reported rather than overwritten. Exactly-once delivery across a fake-server reset is outside the server's guarantees.
+Koin 4.2.2 starts once in `RhinoChatApplication`, with one process-owned store, supplied fake, restart adapter, and repository. `MainActivity` obtains an Activity-owned `ChatViewModel` through `koinViewModel()` and passes it into shared `App`; the ViewModel and repository keep constructor injection. Screens, components, and previews have no Koin lookups. One small graph demonstrates lifetime ownership; manual wiring was also sufficient for this app, and Koin adds a dependency and runtime graph resolution. No compiler plugin or extra module hierarchy is needed.
+
+The ViewModel owns request lifetimes. Cancellation propagates and interrupted sending rows become retryable once before new commands. There is no background sender or process-death draft restoration. The supplied fake remains unchanged at its default 20% failure rate; it simulates delay/failure rather than actual networking. Its in-memory server resets and reuses `srv-N` after process restart. The Android demo adapter gives outgoing acknowledgements and history a canonical `fake-client:<persisted clientId>` identity; seed messages keep their original IDs. Before the first remote request, it atomically converts earlier acknowledged cache IDs, preserving local/client keys, text, timestamps, and delivery status. Pending rows remain available for explicit retry. Conflicting client/content/sender identities still fail atomically. Cached sent messages are retained locally, not uploaded again. Exactly-once delivery across a fake-server reset remains outside the server's guarantees.
 
 The APK is produced at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Select the `androidApp` run configuration in Android Studio to launch it on an emulator or device.
 
 ## Chat UI and previews
 
-Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/ChatScreen.kt` in Android Studio and select Split or Design. It is ordered: stateless `ChatScreen`, lifecycle-aware `ChatRoute`, then private previews and fixtures. The host creates one ViewModel through the lifecycle factory. Substantial bubbles, composer, history status, header, and action-error UI live in `chat/components`; their previews stay beside the component.
+Open `shared/src/commonMain/kotlin/dev/sadeghtahani/rhinochat/chat/ChatScreen.kt` in Android Studio and select Split or Design. It is ordered: stateless `ChatScreen`, lifecycle-aware `ChatRoute`, then private previews and fixtures. The Android host obtains one lifecycle-owned ViewModel from Koin and passes it to shared `App`. Substantial bubbles, composer, history status, header, and action-error UI live in `chat/components`; their previews stay beside the component.
 
 The twelve screen previews cover light/dark, cached errors, loading, empty, RTL with larger text, tablet portrait/landscape, phone landscape, a short keyboard viewport, book fold, and tabletop using the real `RhinoChatTheme` and fixed data. The original seven variants were rendered and visually inspected before the adaptive extension; the final twelve-variant set compiles but has not all been visually inspected. The CLI preview exporter remains unreliable, so use the IDE panel; see [validation notes](docs/VALIDATION.md). Preview callbacks are intentionally inert; the application uses real ViewModel callbacks. Android-backed previews do not verify iOS runtime behavior.
 
-The shared design uses lavender tonal containers, contrasting delivery/error states, asymmetric rounded bubbles, selectable text, platform-localized dates/times, and a multiline composer. New rows and delivery labels animate; the send button responds with a small spring/shape change. The latest-message button appears when browsing history. Message keys preserve the scroll anchor across older-page merges; automatic older loads run while approaching history during a scroll, with an explicit load/retry button as an accessible alternative.
+The shared design uses lavender tonal containers, contrasting delivery/error states, asymmetric rounded bubbles, selectable text, platform-localized dates/times, and a multiline composer. New rows and delivery labels animate; the send button responds with a small spring/shape change. The latest-message button appears when browsing history. Message keys preserve the scroll anchor across older-page merges; automatic older loads observe the viewport and returned cursor even after a gesture ends. Duplicate-only pages can continue while the oldest boundary remains visible; errors pause until explicit retry. A reserved progress strip remains visible during real older-page work, and the history status retains its measured height during retry to avoid clamping the scroll offset. No artificial loading delay is added. An explicit load/retry button remains available.
 
 Adaptive layout uses available window dimensions and separating/occluding hinge bounds. Wide windows center a bounded conversation; compact height reduces chrome and composer lines. Book posture keeps the conversation clear of the hinge; tabletop places history above and input below when space permits. The adaptive canvas owns safe-drawing/keyboard insets. Physical phone landscape was inspected; tablet/foldable emulator runtime verification is blocked by local disk space.
 
@@ -69,6 +71,7 @@ Stable CMP Material 3 1.9.0 keeps `MaterialExpressiveTheme` and `MotionScheme` i
 | Room / KSP | 3.0.3 / 2.3.12 |
 | Bundled SQLite | 2.7.1 |
 | Coroutines / coroutine tests | 1.11.0 |
+| Koin | 4.2.2 |
 | Gradle daemon JDK | 21 |
 | Android minimum / compile / target SDK | 24 / 37 / 37 |
 
@@ -82,4 +85,4 @@ The repository keeps source, Gradle wrapper, Xcode project files, and shared pro
 
 [AGENTS.md](AGENTS.md) contains concise project-specific guidance. Use [validation notes](docs/VALIDATION.md) for checks actually completed and remaining limits.
 
-AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, Compose integration, previews, device interaction checks, and automated verification. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.
+AI assistance has been used for official-documentation research, architecture planning, Android Studio project creation, foundation setup, persistence/identity, send/retry/pagination and ViewModel implementation, Compose integration, previews, restart/history bug investigation and fixes, official Koin research and integration, device interaction checks, IDE diagnostics, and automated verification. No additional test suites were added or run during the restart/history/Koin follow-up at the user's request. The author remains responsible for reviewing and explaining every change. Feature work and validation should extend this disclosure as they happen.

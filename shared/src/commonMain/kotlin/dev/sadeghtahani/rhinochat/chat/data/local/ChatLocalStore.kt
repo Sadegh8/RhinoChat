@@ -106,6 +106,11 @@ class ChatLocalStore internal constructor(
     /** Call once at startup, before new sends start; never on screen re-entry. */
     suspend fun recoverInterruptedMessages(): Int = dao.recoverInterruptedMessages()
 
+    /** Adapter-only compatibility for caches written before the fake's ID normalization. */
+    internal suspend fun namespaceDemoAcknowledgements() {
+        database.withWriteTransaction { dao.namespaceDemoAcknowledgements() }
+    }
+
     override fun close() = database.close()
 
     private suspend fun mergeRemoteMessage(conversationId: String, message: RemoteMessage) {

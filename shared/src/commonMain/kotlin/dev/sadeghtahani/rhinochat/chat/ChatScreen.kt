@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -118,11 +119,14 @@ fun ChatScreen(
     LaunchedEffect(listState) {
         snapshotFlow {
             val layout = listState.layoutInfo
-            latestState.hasMoreHistory && latestState.olderLoad == HistoryLoadState.Idle &&
-                listState.isScrollInProgress && layout.totalItemsCount > 0 &&
+            val nearHistory = latestState.hasMoreHistory && latestState.olderLoad == HistoryLoadState.Idle &&
+                layout.totalItemsCount > 0 &&
                 (layout.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layout.totalItemsCount - 3
-        }.distinctUntilChanged().collect { nearHistory ->
-            if (nearHistory) {
+            // Include cursor progress: duplicate-only cached pages may leave layout unchanged,
+            // and StateFlow may coalesce a very short Loading → Idle transition.
+            latestState.nextHistoryCursor.takeIf { nearHistory }
+        }.distinctUntilChanged().collect { cursor ->
+            if (cursor != null) {
                 loadOlder()
             }
         }
@@ -142,6 +146,12 @@ fun ChatScreen(
                         if (layout.showHeader) ChatHeader(compact = layout.compactHeader)
                         if (layout.showHeader && state.messages.isNotEmpty() && state.initialLoad != HistoryLoadState.Idle) {
                             HistoryStatus(state.initialLoad, false, true, onLoadInitial, Modifier.widthIn(max = 840.dp))
+                        }
+                        // Reserve the strip so starting/stopping a load does not resize the list.
+                        Box(Modifier.fillMaxWidth().height(4.dp)) {
+                            if (state.olderLoad == HistoryLoadState.Loading) {
+                                LinearProgressIndicator(Modifier.fillMaxWidth())
+                            }
                         }
                     }
                 }

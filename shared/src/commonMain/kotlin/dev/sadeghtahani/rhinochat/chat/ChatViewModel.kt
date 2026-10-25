@@ -39,6 +39,7 @@ class ChatViewModel(
             olderLoad = operation.olderLoad,
             hasMoreHistory = (operation.initialLoad == HistoryLoadState.Idle) &&
                 pagination.hasLoadedInitialPage && pagination.nextCursor != null,
+            nextHistoryCursor = pagination.nextCursor,
             isEnqueueing = operation.isEnqueueing,
             actionError = operation.actionError,
         )

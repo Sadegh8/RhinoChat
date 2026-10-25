@@ -120,11 +120,49 @@ Both observed device sends succeeded with the supplied default 20% failure rate.
 
 A physical Pixel 7 Pro landscape screenshot was inspected for compact chrome, readable input, and cutout/gesture clearance. The final twelve-preview matrix compiles; not every adaptive preview was visually inspected. Tablet/foldable emulator runtime checks could not proceed because the available disk space was below the emulator userdata requirement. The attempted keyboard screenshot changed orientation and does not establish adaptive landscape keyboard behavior. Rotation was restored to automatic mode. No additional tests were run after the user requested stopping further testing.
 
-Subsequent user review reported that scrolling to the oldest loaded message does not reliably fetch more history, loading feedback flashes, and new sends repeatedly fail with an identity error after earlier successful sends. These are open acceptance issues, despite the passing automated checks and the earlier successful manual scenarios. The next milestone must investigate automatic history triggering and the fake server's reused IDs after process restart without clearing cached messages or changing the supplied fake.
+Subsequent user review reported that scrolling to the oldest loaded message does not reliably fetch more history, loading feedback flashes, and new sends repeatedly fail with an identity error after earlier successful sends. These were open acceptance issues at that handoff, despite the passing automated checks and earlier successful manual scenarios. The corrective follow-up below addresses them without clearing cached messages or changing the supplied fake.
+
+## Restart/history/Koin follow-up: 24 October 2026
+
+This follow-up starts from `7986d27`. At the user's request, no new tests were added and no test suites, `scripts/verify`, or lint tasks were run. Earlier passing test counts and lint results above are historical evidence, not verification of this change.
+
+Source findings and fixes:
+
+- The unchanged fake recreates 120 seed rows and reuses outgoing `srv-120`, etc., after process restart. Room preserves earlier acknowledgements with those IDs, so the generic conservative identity merge correctly rejects later distinct messages. The Android demo graph now wraps the transport with client-based outgoing identity normalization and an atomic legacy acknowledgement conversion. The common conflict/transaction policy remains strict. Pending text and client IDs are not regenerated; no data reset is used.
+- Automatic older loading required an active scroll, which could end before a request completed or a duplicate-only refreshed page advanced. The screen now observes the viewport and next cursor while idle, including when stationary. Failed load state disables automatic requests until explicit retry. Each repository call still fetches one page and atomically saves its returned cursor.
+- The lazy status row could leave the viewport while loading, and changing an error/button to a small spinner shortened content at the oldest scroll limit. A fixed-height header progress slot displays actual older-page work, while the history status retains its maximum measured height while composed. No minimum loading duration, extra fake latency, or automatic retry delay was added.
+- Koin 4.2.2 is pinned in the version catalog, confined to the Android composition root. One module owns process singleton store/fake/adapter/repository definitions and an Activity-owned ChatViewModel definition. Shared App receives the ViewModel explicitly; common constructors, stateless screens, and previews remain independent of Koin.
+
+Actual checks:
+
+| Check | Result and scope |
+| --- | --- |
+| Final `:androidApp:assembleDebug :shared:compileCommonMainKotlinMetadata`, JDK 21 | Passed. Local build log: `artifacts/verification/restart-fixes-build.log`. Existing Room expect/actual beta warnings remain; no AGP/toolchain upgrade. |
+| Source review | Reviewed cancellation propagation, one-time initialization, adapter normalization before merging, atomic legacy conversion, retained local/client keys, strict content conflicts, cursor progress, and idle-only automatic eligibility. This is not a new automated correctness test. |
+| In-place install/launch on Pixel 7 Pro API 37, USB `2B041FDH30092R` | Passed with app data retained. Koin graph resolved and chat opened. The wireless transport was not used. |
+| Existing reported messages | `Hello Rhino Team`, `History stays put`, `Test`, and `Hi` remained visible. Both failed `Test` and `Hi` reached Sent through explicit retry; no identity-error banner remained. Some retry attempts did not complete successfully before later success; no deterministic failure schedule was substituted. |
+| Fresh process restart and new send | Closed/reopened the process, retaining the four messages. `Restart send check` became Sent despite a separate initial-history failure. Initial history recovered through explicit Try again. This exercises the fake's reset/reused-ID path through visible UI; database identities were not exported or independently inspected. |
+| Older history | Scrolling reached the old cached boundary at seed 81; a simulated older-load error remained awaiting explicit retry. Retry exposed seeds 80/79 while the viewport stayed in history around 87–81. Further scrolling reached seed 61 and automatically attempted the next page, which produced another explicit-retry error. This covers duplicate cached pages after head refresh, real older-page progress, and boundary-triggered loading; it is not an exhaustive run through all 120 seeds. |
+| Final status-sizing build | Built and installed; all five messages above were visible with no error banner on launch. The sizing adjustment was source/build reviewed; no new screenshot, rendered-preview matrix, or frame-by-frame spinner-duration measurement was made. |
+| Hygiene | `git diff --check` passed. Supplied FakeChatApi source is unchanged and the graph still calls `FakeChatApi()` with its default failure rate. Changes were left unstaged and uncommitted for the initial review. |
+
+Automatic approval review rejected exporting the conversation database and saving a device screenshot because those actions could copy sensitive conversation content. Neither export was performed; permitted UI hierarchy inspection was used instead. No cache was cleared. Rotation settings were not changed. No emulator/system image was installed.
+
+The default 20% random failure rate is intentional, so occasional send/history failures and explicit retry remain expected. Stable demo identities do not restore the fake's lost idempotency memory or guarantee exactly-once server delivery across resets. A broader deterministic regression suite, accessibility pass, complete final adaptive preview rendering, tablet/foldable runtime, and iOS host integration were not performed in this follow-up.
+
+This is corrective Android/DI work after the UI milestone, not iOS showcase effort. No iOS work was performed. The original 3–4 hour submission target is a budget; the repository does not contain a complete actual-effort ledger, so this follow-up does not claim that total project effort met it.
+
+## Commit and unresolved-reference check: 25 October 2026
+
+The user authorized committing the reviewed restart/history/Koin changes and requested resolving any outstanding files. Git reports no unmerged entries or conflict markers. Android Studio analysis of all ten changed Kotlin files, including the new restart-safe adapter, reports no unresolved references, errors, or warnings; informational style/spelling hints remain.
+
+With JDK 21, `:androidApp:assembleDebug :shared:compileCommonMainKotlinMetadata :shared:compileKotlinJvm :shared:compileKotlinIosSimulatorArm64` passed. This compiles shared production sources for the Android, JVM, and iOS simulator targets; it does not establish an iOS host build, link, or runtime result. Room's generated expect/actual beta warnings remain. The local log is `artifacts/verification/commit-build.log`. No test suites or lint tasks were run, preserving the user's validation constraint.
+
+`git diff --check` passed. The commit includes the new adapter, source/configuration changes, and documentation; ignored build output, local SDK/IDE files, and verification artifacts are excluded. No push was requested or performed.
 
 ## Remaining scope
 
 - The SwiftUI iOS host was not built, linked, launched, or tested in a simulator. Shared Kotlin/Native compilation is a narrower result.
 - Android's chat UI is wired; the optional iOS host deliberately remains on the welcome starter until it has a platform remote adapter and host integration.
-- Remaining Android acceptance/handoff work includes a broader device failure/retry flow, accessibility checks, and final walkthrough/time disclosure. Process-death draft restoration and background retry remain optional.
+- Remaining Android acceptance/handoff work includes broader deterministic regression coverage when authorized, accessibility checks, and final walkthrough/time disclosure. Process-death draft restoration and background retry remain optional.
 - The repository is local; no remote repository has been created or pushed.
