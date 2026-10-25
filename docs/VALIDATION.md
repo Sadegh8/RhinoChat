@@ -409,3 +409,19 @@ The latest-message button and automatic follow now use `scrollToItem(0)` in the 
 | `:androidApp:assembleDebug :shared:compileCommonMainKotlinMetadata` | Passed with JDK 21; existing Room expect/actual beta warnings remain |
 | `git diff --check` | Passed |
 | Device/runtime scroll feel and frame timing | Not re-measured in this change; build success does not establish perceived smoothness or frame performance |
+
+### Shared Android reference diagnostics — 25 October 2026
+
+Reconfirmed the Application editor diagnostics with `android studio analyze-file --project RhinoChat`: Android Studio Quail 1 2026.1.1 Patch 2 reports unresolved imports for declarations in `shared/src/androidMain`, followed by unresolved fake API types and Koin type-inference errors. The declarations exist and are public. A fresh JDK 21 compilation, `./gradlew :androidApp:compileDebugKotlin --rerun-tasks --console=plain`, passed with all 22 tasks executed, including the shared Android compilation and Application Kotlin compilation. Existing Room expect/actual beta warnings remain.
+
+This establishes a discrepancy between IDE analysis and Gradle compilation. The pattern points to IDE resolution of the shared Android sources; the precise IDE/model defect has not been isolated or fixed. No production source or dependency configuration was changed, and no tests or device checks were run for this diagnosis.
+
+### Fixing overlapping Android/JVM test source roots — 25 October 2026
+
+The imported IDE model exposed the cause: `jvmTest.kotlin.srcDir` pointed inside the Android production tree. Android Studio imported `shared/src/androidMain/kotlin/dev/sadeghtahani/rhinochat/chat/data` as a JVM-test content root, with its `remote` child as test source. That nested root took ownership of Android transport declarations and the enclosing local-store directory away from the Android module during app analysis.
+
+Replaced the overlapping source-directory registration with `syncAndroidTransportForJvmTest`, a Gradle Sync task that supplies a separate generated JVM-test source directory under `shared/build`. Registering the task as a source directory preserves the generation dependency; Sync updates changed files and removes stale copies. All three generated transport Kotlin files match their Android originals byte for byte. The supplied fake remains unchanged in Android production code; no implementation files, dependency versions, IDE settings or module boundaries changed.
+
+After Gradle sync completed, Android Studio Quail 1 2026.1.1 Patch 2 reports zero errors in `RhinoChatApplication` (only its existing SharedPreferences KTX suggestion), and declaration navigation resolves `createChatLocalStore` to the original Android source. `ChatUiFixture` reports no issues; `RestartSafeFakeChatRemoteDataSourceTest` has only two existing style suggestions and no unresolved references. The original Application import/Koin diagnostics are resolved.
+
+Focused validation executed all four `RestartSafeFakeChatRemoteDataSourceTest` cases successfully after generating and recompiling the JVM-test inputs. `./scripts/verify` passed: debug APK, isolated UI-test APK compilation, common metadata, Android host tests, JVM tests and lint. That verification reused 78 successful JVM test results from the build cache and 42 up-to-date Android-host results; it did not freshly execute those full suites. No device tests were run for this build-configuration fix. README's current unresolved-reference limitation was removed; earlier entries remain historical evidence.

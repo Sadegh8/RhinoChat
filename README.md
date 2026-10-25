@@ -51,7 +51,6 @@ The supplied fake API is unchanged and defaults to **20% random failures**. The 
 
 - Draft recovery and background retry are implemented and have persistence/worker coverage. Actual system-kill restoration and closed-process OS scheduling still need end-to-end checks. Android Force stop pauses background work.
 - The fake server resets with the process, so exactly-once delivery across that reset is not guaranteed.
-- Android Studio still reports unresolved shared Android references in `RhinoChatApplication`, despite successful builds and device tests. This is not claimed fixed.
 - API 24 runtime, TalkBack, and the full tablet/foldable matrix remain unchecked. These and the process-death checks would be my next steps.
 - The iOS host remains a starter; completing its chat integration and platform checks is outside this Android submission.
 

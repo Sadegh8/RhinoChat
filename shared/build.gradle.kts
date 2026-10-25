@@ -9,6 +9,13 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val syncAndroidTransportForJvmTest by tasks.registering(Sync::class) {
+    from("src/androidMain/kotlin") {
+        include("dev/sadeghtahani/rhinochat/chat/data/remote/**")
+    }
+    into(layout.buildDirectory.dir("generated/sources/androidTransportForJvmTest/kotlin"))
+}
+
 kotlin {
     // A host JVM target runs real Room tests without an emulator or Android runtime shadows.
     jvm {
@@ -62,9 +69,10 @@ kotlin {
             implementation(libs.coroutines.test)
         }
         jvmTest {
-            // These Android transport sources use JVM APIs only. Compile the same sources in
-            // host tests to exercise the supplied fake and restart adapter with real Room.
-            kotlin.srcDir("src/androidMain/kotlin/dev/sadeghtahani/rhinochat/chat/data/remote")
+            // These transport sources use JVM APIs only. Test the Android implementation
+            // with real Room, using a generated copy so IDE module roots never overlap.
+            // Register the task itself to generate fresh inputs before test compilation.
+            kotlin.srcDir(syncAndroidTransportForJvmTest)
             dependencies {
                 implementation(libs.kotlin.testJunit)
             }
