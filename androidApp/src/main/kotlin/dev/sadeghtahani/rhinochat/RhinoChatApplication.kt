@@ -20,6 +20,7 @@ import dev.sadeghtahani.rhinochat.chat.data.repository.OfflineFirstChatRepositor
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkControls
 import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkSettings
 import dev.sadeghtahani.rhinochat.demo.data.remote.DemoChatRemoteDataSource
+import dev.sadeghtahani.rhinochat.demo.data.remote.DemoNetworkRandom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -60,8 +61,9 @@ private val chatModule = module {
     single<ChatLocalStore> { createChatLocalStore(androidContext()) }
     single { WorkManagerOutgoingMessageRetryScheduler(androidContext(), get()) }
     single<OutgoingMessageRetryScheduler> { get<WorkManagerOutgoingMessageRetryScheduler>() }
-    // Failures are controlled explicitly by the launch screen, outside the unchanged fake.
-    single<ChatApi> { FakeChatApi(failureRate = 0.0) }
+    // Keep one fake/server and its default 20% policy. The controls only override its random
+    // draw for reliable demos; toggling never creates a second server or loses its messages.
+    single<ChatApi> { FakeChatApi(random = DemoNetworkRandom(get())) }
     single<ChatRemoteDataSource> {
         RestartSafeFakeChatRemoteDataSource(
             DemoChatRemoteDataSource(AndroidChatRemoteDataSource(get()), get()), get(),
@@ -79,7 +81,7 @@ private fun createDemoNetworkControls(context: Context): DemoNetworkControls {
         failHistory = preferences.getBoolean(KEY_FAIL_HISTORY, false),
         slowNetwork = preferences.getBoolean(KEY_SLOW_NETWORK, false),
         loseFirstReply = preferences.getBoolean(KEY_LOSE_FIRST_REPLY, false),
-        randomFailures = preferences.getBoolean(KEY_RANDOM_FAILURES, false),
+        randomFailures = preferences.getBoolean(KEY_RANDOM_FAILURES, true),
     )
     return DemoNetworkControls(initial) { settings ->
         preferences.edit()

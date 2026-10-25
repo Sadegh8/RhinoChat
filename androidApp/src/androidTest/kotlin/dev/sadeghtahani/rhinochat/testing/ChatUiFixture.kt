@@ -102,10 +102,12 @@ internal class ControlledChatRemote : ChatRemoteDataSource {
     private val delegate = AndroidChatRemoteDataSource(FakeChatApi(failureRate = 0.0, random = Random(42)))
     val historyReply = CompletableDeferred<Boolean>()
     val historyCalls = AtomicInteger()
+    val historyCursors = CopyOnWriteArrayList<String?>()
     val attempts = CopyOnWriteArrayList<SendAttempt>()
     val sendStarted = Channel<SendAttempt>(Channel.UNLIMITED)
 
     override suspend fun getMessages(conversationId: String, cursor: String?, limit: Int): MessagePage {
+        historyCursors += cursor
         if (historyCalls.incrementAndGet() == 1 && !historyReply.await()) {
             throw ChatDataException(ChatError.NETWORK)
         }

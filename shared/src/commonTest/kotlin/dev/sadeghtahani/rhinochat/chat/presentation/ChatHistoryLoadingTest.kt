@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import dev.sadeghtahani.rhinochat.chat.domain.model.ChatError
+import dev.sadeghtahani.rhinochat.chat.domain.model.ChatMessage
+import dev.sadeghtahani.rhinochat.chat.domain.model.DeliveryStatus
 import dev.sadeghtahani.rhinochat.chat.presentation.model.ChatUiState
 import dev.sadeghtahani.rhinochat.chat.presentation.model.HistoryLoadState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,8 +20,30 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatHistoryLoadingTest {
+    @Test fun newHistoryWaitsForItsLayoutBeforeCheckingTheOlderBoundary() = runTest {
+        var state by mutableStateOf(ready("20", messageCount = 1).copy(
+            initialLoad = HistoryLoadState.Loading, hasMoreHistory = false,
+        ))
+        var count by mutableIntStateOf(2) // One outgoing message and the history status row.
+        var lastVisible by mutableIntStateOf(1)
+        val requests = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            historyLoadRequests({ state }, { count }, { lastVisible }).collect(requests::add)
+        }
+        // Room publishes the first history page before LazyColumn measures it.
+        Snapshot.withMutableSnapshot { state = ready("20", messageCount = 21) }
+        runCurrent()
+        assertEquals(emptyList(), requests)
+        Snapshot.withMutableSnapshot { count = 22; lastVisible = 5 }
+        runCurrent()
+        assertEquals(emptyList(), requests)
+        Snapshot.withMutableSnapshot { lastVisible = 21 }
+        runCurrent()
+        assertEquals(listOf("20"), requests)
+    }
+
     @Test fun completingLoadBeforeRoomPublishesCursorDoesNotRequestTheOldPageAgain() = runTest {
-        var state by mutableStateOf(ready("100"))
+        var state by mutableStateOf(ready("100", messageCount = 120))
         val requests = mutableListOf<String>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             historyLoadRequests({ state }, { 121 }, { 120 }).collect(requests::add)
@@ -129,7 +153,10 @@ class ChatHistoryLoadingTest {
         assertEquals(emptyList(), requests)
     }
 
-    private fun ready(cursor: String?) = ChatUiState(
+    private fun ready(cursor: String?, messageCount: Int = 20) = ChatUiState(
+        messages = List(messageCount) { index ->
+            ChatMessage(index.toLong(), "chat", null, "server-$index", "colleague", "Message $index", index.toLong(), DeliveryStatus.SENT)
+        },
         initialLoad = HistoryLoadState.Idle,
         hasMoreHistory = true,
         nextHistoryCursor = cursor,

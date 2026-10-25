@@ -13,7 +13,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,9 +22,7 @@ import kotlin.test.assertFalse
 class DemoChatRemoteDataSourceTest {
     private val controls = DemoNetworkControls()
     private val server = RecordingServer()
-    private val remote = DemoChatRemoteDataSource(server, controls, object : Random() {
-        override fun nextBits(bitCount: Int) = 0
-    })
+    private val remote = DemoChatRemoteDataSource(server, controls)
 
     @Test fun offlineBlocksBothOperationsAndTurningItOffAllowsRecovery() = runTest {
         controls.update(DemoNetworkSettings(offline = true))
@@ -62,15 +59,6 @@ class DemoChatRemoteDataSourceTest {
         // A separate deliberate send still loses its own first reply.
         assertFailsWith<ChatDataException> { remote.sendMessage("chat", "other", "hello") }
         assertEquals(2, server.messages.size)
-    }
-
-    @Test fun randomFailuresAreOptInAndCanBeTurnedOff() = runTest {
-        remote.getMessages("chat", null, 20)
-        controls.update(DemoNetworkSettings(randomFailures = true))
-        assertFailsWith<ChatDataException> { remote.getMessages("chat", null, 20) }
-        controls.update(DemoNetworkSettings())
-        remote.getMessages("chat", null, 20)
-        assertEquals(2, server.historyCalls)
     }
 
     @Test fun slowConnectionDelaysTransportAndCancellationDoesNotReachServer() = runTest {

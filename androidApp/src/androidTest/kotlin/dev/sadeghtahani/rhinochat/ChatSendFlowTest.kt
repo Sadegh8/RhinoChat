@@ -150,6 +150,7 @@ class ChatSendFlowTest {
         assertDraft("Do not clear this newer draft")
         assertBubble(pending, pending.text, "Sending")
         assertEquals(1, fixture.remote.historyCalls.get())
+        assertEquals(listOf<String?>(null), fixture.remote.historyCursors.toList())
         assertEquals(1, fixture.remote.attempts.size)
 
         fixture.remote.historyReply.complete(true)
@@ -157,7 +158,9 @@ class ChatSendFlowTest {
         fixture.remote.attempts[0].reply.complete(SendReply.ACKNOWLEDGE)
         assertBubble(pending, pending.text, "Sent")
         assertDraft("Do not clear this newer draft")
+        ui.waitForIdle()
         assertEquals(1, fixture.remote.historyCalls.get())
+        assertEquals(listOf<String?>(null), fixture.remote.historyCursors.toList())
         assertEquals(1, fixture.remote.attempts.size)
         assertEquals(pending.localId, outgoing(1).single().localId)
     }

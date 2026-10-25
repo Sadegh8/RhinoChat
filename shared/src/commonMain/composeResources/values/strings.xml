@@ -38,7 +38,7 @@
     <string name="demo_lost_reply">Lose delivery confirmation</string>
     <string name="demo_lost_reply_detail">Send succeeds, but its first reply is lost. Retry confirms the same message.</string>
     <string name="demo_random">Random network failures</string>
-    <string name="demo_random_detail">20% chance per request. Off gives a reliable connection.</string>
+    <string name="demo_random_detail">On by default: the supplied API fails 20% of requests. Turn off for a reliable connection.</string>
     <string name="demo_reset">Reset controls</string>
     <string name="demo_return_hint">Press Back from chat to change these controls, then retry. Changes affect new requests and are remembered after the app restarts.</string>
     <string name="demo_start">Start app</string>

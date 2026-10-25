@@ -64,25 +64,6 @@ class ChatViewModelTest {
         }
     }
 
-    @Test fun initialLoadStartsOnceAndDraftSurvivesStateRecollection() = withViewModel(collect = false) { vm, repository ->
-        val firstCollector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.uiState.collect {}
-        }
-        vm.onDraftChanged("Retain across rotation")
-        runCurrent()
-        assertEquals(1, repository.initialCalls)
-        firstCollector.cancel()
-        advanceTimeBy(5_001)
-        runCurrent()
-        val secondCollector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.uiState.collect {}
-        }
-        runCurrent()
-        assertEquals("Retain across rotation", vm.uiState.value.draft)
-        assertEquals(1, repository.initialCalls)
-        secondCollector.cancel()
-    }
-
     @Test fun initialAndOlderFailuresPreserveCachedMessagesAndHaveSeparateRetryState() = withViewModel { vm, repository ->
         repository.messages.value = listOf(message())
         repository.initialResult = ChatOperationResult.Failed(ChatError.NETWORK)

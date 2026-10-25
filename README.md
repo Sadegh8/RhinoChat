@@ -2,7 +2,7 @@
 
 An Android-first Compose Multiplatform code challenge by Sadegh Tahani.
 
-Android implements the challenge's single conversation screen with Room-backed cached messages and drafts, optimistic sends, manual retry, persistent WorkManager retry, paginated history, and independent loading errors. Database observation failures preserve the last readable cache and leave input controls live; Try again reconnects observation. The supplied fake remains unchanged; the launch screen controls simulated network failures, which default to off and persist across process restarts. Current build/device evidence and limits are recorded in [validation](docs/VALIDATION.md). The optional iOS host still displays the foundation screen pending its own remote integration.
+Android implements the challenge's single conversation screen with Room-backed cached messages and drafts, optimistic sends, manual retry, persistent WorkManager retry, paginated history, and independent loading errors. Database observation failures preserve the last readable cache and leave input controls live; Try again reconnects observation. The supplied fake remains unchanged; the launch screen keeps its default 20% random failures enabled on a fresh install, with persistent test overrides for reliable or intentionally failing requests. Current build/device evidence and limits are recorded in [validation](docs/VALIDATION.md). The optional iOS host still displays the foundation screen pending its own remote integration.
 
 ## Project layout
 
@@ -32,7 +32,7 @@ This builds the debug APK and instrumented test APK, compiles common metadata, r
 ./gradlew :androidApp:lintDebug
 ```
 
-`ChatLocalStoreTest` checks real Room/SQLite persistence and transactions. `OfflineFirstChatRepositoryTest` adds delayed sends, failure/retry, lost acknowledgements, cancellation, restart, and overlapping history. Common `ChatViewModelTest` checks draft ownership and independent loading/delivery state on both runners. `AndroidChatRemoteDataSourceTest` exercises the actual supplied fake with deterministic failures and virtual time. `PlatformSmokeTest` checks platform wiring. See [actual results](docs/VALIDATION.md).
+`ChatLocalStoreTest` checks real Room/SQLite persistence and transactions. `OfflineFirstChatRepositoryTest` adds delayed sends, failure/retry, lost acknowledgements, cancellation, restart, and overlapping history. Common `ChatViewModelTest` checks draft ownership and independent loading/delivery state on both runners. `AndroidChatRemoteDataSourceTest` exercises the actual supplied fake with deterministic failures and virtual time. See [actual results](docs/VALIDATION.md).
 
 `ChatViewModelTest` also covers cache observation failures and explicit recovery without freezing drafts or operation state. `ChatHistoryLoadingTest` exercises the actual Compose snapshot observer while stationary, including duplicate-only cursor progress and error/retry gating. `RestartSafeFakeChatRemoteDataSourceTest` combines the actual Android transport/fake sources with file-backed Room on the host JVM to check legacy ID conversion, reset-safe sends, lost responses, rollback, and cached reopen with forced failures. Only test builds share those JVM-compatible transport sources; Android production wiring is unchanged.
 
@@ -119,7 +119,7 @@ The author reported approximately one hour spent before this follow-up on 25 Oct
 
 ### Launch test controls
 
-Before chat starts, choose offline mode, failed sends, failed history, an extra 3-second delay, lost first delivery replies, or random failures (20%), then tap **Start app**. All faults default to off. Press Android Back from chat to adjust controls; changes affect new requests, so turn a fault off and retry to recover. Settings persist across process restarts. Network controls never clear saved data. **Reset cache** separately removes downloaded history and its pagination so Start app loads it again; user-created sent, sending, and failed messages remain saved. Reset waits for active history loading to finish. Lost replies commit on the fake server before reporting failure and allow the same client identity to succeed on retry.
+Before chat starts, choose offline mode, failed sends, failed history, an extra 3-second delay, lost first delivery replies, or random failures (20%), then tap **Start app**. Random failures default to on; all other faults default to off. The toggle controls the unchanged supplied fake’s own 20% failure policy, including its normal request delay. Turning it off gives a reliable connection without replacing the server or clearing its messages. Existing saved toggle values are retained. Press Android Back from chat to adjust controls; turn a fault off and retry to recover. Settings persist across process restarts. Network controls never clear saved data. **Reset cache** separately removes downloaded history and its pagination so Start app loads it again; user-created sent, sending, and failed messages remain saved. Reset waits for active history loading to finish. Lost replies commit on the fake server before reporting failure and allow the same client identity to succeed on retry.
 
 Chat shows a persistent **You’re offline** banner while Go offline is enabled. Turning it off removes the banner. This describes the demo control, not physical device connectivity.
 

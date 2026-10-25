@@ -9,7 +9,7 @@ data class DemoNetworkSettings(
     val failHistory: Boolean = false,
     val slowNetwork: Boolean = false,
     val loseFirstReply: Boolean = false,
-    val randomFailures: Boolean = false,
+    val randomFailures: Boolean = true,
 )
 
 enum class CacheResetStatus { Idle, Working, Done, Busy, Failed }

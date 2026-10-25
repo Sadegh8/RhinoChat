@@ -10,13 +10,11 @@ import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.random.Random
 
 /** Fault injection around the real transport; the supplied fake itself stays unchanged. */
 class DemoChatRemoteDataSource(
     private val delegate: ChatRemoteDataSource,
     private val controls: DemoNetworkControls,
-    private val random: Random = Random.Default,
 ) : ChatRemoteDataSource {
     private val replyMutex = Mutex()
     private val lostReplies = mutableSetOf<Pair<String, String>>()
@@ -40,7 +38,7 @@ class DemoChatRemoteDataSource(
 
     private suspend fun beforeRequest(settings: DemoNetworkSettings, fail: Boolean) {
         if (settings.slowNetwork) delay(3_000)
-        if (settings.offline || fail || (settings.randomFailures && random.nextDouble() < 0.2)) {
+        if (settings.offline || fail) {
             throw ChatDataException(ChatError.NETWORK)
         }
     }

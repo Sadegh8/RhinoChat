@@ -6,6 +6,8 @@ import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.ChatApi
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.FakeChatApi
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.MessageDto
 import dev.sadeghtahani.rhinochat.chat.data.remote.supplied.MessagePageDto
+import dev.sadeghtahani.rhinochat.demo.data.DemoNetworkControls
+import dev.sadeghtahani.rhinochat.demo.data.remote.DemoNetworkRandom
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
@@ -15,6 +17,31 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class AndroidChatRemoteDataSourceTest {
+    @Test fun defaultFailureThresholdAndReliableOverrideUseTheSameSuppliedServer() = runTest {
+        val controls = DemoNetworkControls()
+        val draws = ArrayDeque(listOf(0.19, 0.2, 0.19))
+        val random = DemoNetworkRandom(controls, object : Random() {
+            override fun nextBits(bitCount: Int): Int = 0
+            override fun nextDouble(): Double = draws.removeFirst()
+        })
+        // Deliberately omit failureRate: this checks the supplied default, not a replacement.
+        val remote = AndroidChatRemoteDataSource(FakeChatApi(random = random))
+        assertTrue(controls.settings.value.randomFailures)
+        assertEquals(ChatError.NETWORK, assertFailsWith<ChatDataException> {
+            remote.getMessages("chat", null, 20)
+        }.error)
+        assertEquals(20, remote.getMessages("chat", null, 20).messages.size)
+
+        controls.update(controls.settings.value.copy(randomFailures = false))
+        val sent = remote.sendMessage("chat", "same-client", "Keep this server")
+        controls.update(controls.settings.value.copy(randomFailures = true))
+        assertFailsWith<ChatDataException> { remote.sendMessage("chat", "same-client", sent.text) }
+        controls.update(controls.settings.value.copy(randomFailures = false))
+        assertEquals(sent, remote.sendMessage("chat", "same-client", sent.text))
+        assertEquals(1, remote.getMessages("chat", null, 20).messages.count { it.clientId == "same-client" })
+        assertTrue(draws.isEmpty())
+    }
+
     @Test fun suppliedApiPaginatesNewestFirstAndIsIdempotentByClientId() = runTest {
         val remote = AndroidChatRemoteDataSource(FakeChatApi(failureRate = 0.0, random = Random(42)))
         val first = remote.getMessages("chat", null, 20)
